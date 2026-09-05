@@ -1,0 +1,10 @@
+{
+  "description": "A user-friendly interface built with Vue and Element Plus that streamlines tasks and enhances productivity for web users.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}

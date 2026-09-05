@@ -1,0 +1,36 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root, #app {
+  height: 100%;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-size: 14px;
+  color: #0B1220;
+  background: #F5F7FA;
+}
+
+/* Element Plus overrides */
+.el-menu {
+  border-right: none !important;
+}
+
+.el-table th {
+  background: #F8FAFB !important;
+  color: #526075 !important;
+  font-weight: 500;
+}
+
+.el-tag {
+  border-radius: 3px;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #D9DEE7; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #B0B9C6; }
