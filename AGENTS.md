@@ -1,41 +1,65 @@
-# figma-make-app
+# lims-front
 
-React + Vite + Tailwind CSS project running inside Figma Make.
+Vue 3 + Vite + Element Plus prototype for the Composable AI-Native Laboratory Operations Platform (LIMS).
 
-## Development Server
+## Product architecture
 
-A Vite development server is **already running** on `$PORT` (default 8443). You don't need to start it manually.
+This repository is a front-end prototype for LIMS v2. The UI must follow these product rules:
 
-- Preview URL: The user can access the running app through the preview panel
-- Hot reload: Changes to source files are reflected immediately
+- `Scenario Pack` is the only business configuration unit that is validated and published.
+- A published scenario version is immutable and runtime requests lock its snapshot/version.
+- Reusable assets (test items, standards, methods, limits/formulas, forms, report templates, AI skills) are managed independently and referenced by Scenario Packs.
+- Workflow design is part of Scenario Pack configuration. A workflow definition itself is saved as a draft/configuration asset; publishing happens from the Scenario Pack lifecycle.
+- Workflow node types come from platform capabilities. A node may have a backend executor plus optional config/runtime UI renderers.
+- Generic components must not hard-code Food, Environment, Metrology, Battery, Nuclear or other domain-specific branches when the variation can be driven by scenario metadata/schema.
+- AI is a governed business capability. It should not replace deterministic rules, formulas, permissions, version locking or human approval.
 
-## Project Structure
+## Stack
 
-This is the canonical project structure. Start with task-relevant files below. Only follow imports or inspect other files when required, when a documented path is missing, or when the repository contradicts this guide.
+- Vue 3
+- TypeScript
+- Vue Router
+- Element Plus + `@element-plus/icons-vue`
+- Vite 8
+- pnpm
 
-- `src/main.tsx` - React entrypoint; imports `src/index.css` and mounts `src/App.tsx` into the `#root` element
-- `src/App.tsx` - Primary application component and the usual starting point for UI work
-- `src/index.css` - Global CSS entrypoint and Tailwind CSS v4 import
-- `index.html` - Vite HTML shell containing the `#root` element and loading `src/main.tsx`
-- `package.json` - Project dependencies and the Vite build, development, preview, and formatting scripts
-- `vite.config.ts` - Vite configuration with React, Tailwind CSS v4, and Figma Make plugins plus the `@` alias for `src`
-- `.mise.toml` - Toolchain versions for Node.js and pnpm
+Entrypoints:
 
-## Dependencies
+- `src/main.ts` — application bootstrap, Element Plus and global icon registration.
+- `src/App.vue` — root router outlet.
+- `src/router/index.ts` — route table.
+- `src/components/Layout.vue` — shared enterprise shell and navigation.
+- `src/index.css` — enterprise semantic tokens and global Element Plus mapping.
+- `src/views/*` — prototype workbenches and configuration screens.
 
-- Runtime: React 19 and React DOM 19
-- Styling: Tailwind CSS v4 with the `@tailwindcss/vite` plugin
-- Build tooling: Vite 8, TypeScript 5.7, and `@vitejs/plugin-react`
-- Formatting: oxfmt
+## Enterprise UI rules
 
-## Styling
+Use a restrained enterprise/industrial software style:
 
-This project uses **Tailwind CSS v4** through the `@tailwindcss/vite` plugin configured in `vite.config.ts`. `src/index.css` imports Tailwind with `@import 'tailwindcss';`. Use Tailwind utility classes directly in JSX and put global CSS or Tailwind v4 theme customization in `src/index.css`. This scaffold does not need a Tailwind config file or PostCSS config.
+- One blue interaction system plus blue-gray neutrals.
+- Use semantic tokens instead of adding arbitrary colors in pages.
+- Body text 14px; labels 13px; metadata 12px.
+- Control radius 4px; panel/dialog radius 6px.
+- Sidebar 220px; topbar 48px; desktop page padding 24px 32px.
+- Flat surfaces, thin borders, no decorative gradients, glass blur, glow, thick shadows or card-lift animation.
+- Use one consistent monochrome outline icon language. Color indicates state, not module identity.
+- Do not use emoji, 3D icons, colorful icon tiles, duotone icons or purple-gradient AI styling.
+- AI markers must be visually subordinate to the business task/data.
+- Professional workbenches (workflow, sampling, report design, review) may have specialized layouts; only unify their shell, typography, controls and semantic color system.
 
-`src/main.tsx` imports `src/index.css`, so global font wiring belongs in `src/index.css`. Keep CSS `@import` statements first, then add any `@font-face` rules and font-family defaults there.
+## Interaction and accessibility
+
+- Preserve visible focus states.
+- Provide loading, empty, error, disabled and permission states where relevant.
+- Keep table overflow inside the table container.
+- Avoid page-level horizontal overflow on desktop.
+- Verify layouts at 1366, 1440, 1920 and 390px when implementing production UI.
+- Never introduce fake toolbar controls or navigation entries without a defined product purpose.
 
 ## Code quality
 
-- Use double quotes for strings containing apostrophes (`"We're here to help"`), or escape them in single-quoted strings. An unescaped apostrophe in a single-quoted string breaks the build.
-- Ensure JSX tags are closed and braces are balanced.
-- Export components as default exports.
+- Prefer reusable data-driven models over large page-specific conditionals.
+- Do not add a second UI component framework.
+- Keep route targets valid when changing navigation.
+- Do not let view components mutate immutable published-scenario data.
+- Run `pnpm build` and `pnpm format` before merging implementation changes when a runtime environment is available.
