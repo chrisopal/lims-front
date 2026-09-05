@@ -41,7 +41,8 @@ const router = createRouter({
         { path: 'resources/equipment', component: () => import('@/views/EquipmentPage.vue') },
         { path: 'resources/personnel', component: () => import('@/views/PersonnelPage.vue') },
         { path: 'resources/labs', component: () => import('@/views/LabsPage.vue') },
-        // 专业工作台
+        // 专业工作台；保留已有采样页的旧深链接，统一回到正式“我的工作”路由。
+        { path: 'workbench/my-work', redirect: '/app/operations/my-work' },
         { path: 'workbench/field-sampling', component: () => import('@/views/FieldSamplingWorkbench.vue') },
         { path: 'workbench/metrology', component: () => import('@/views/MetrologyWorkbench.vue') },
         // 平台管理

@@ -1,550 +1,206 @@
 <template>
-  <div class="builder-shell">
-    <!-- Top header -->
-    <div class="builder-header">
-      <div class="bh-left">
-        <div class="bh-context">
-          <span class="bh-scene-label">场景：</span>
-          <el-select v-model="activeScenario" size="small" style="width:220px">
-            <el-option label="第三方食品理化检测 v1.3 Draft" value="food" />
-            <el-option label="环境水质监测 v0.9 Draft" value="env" />
-            <el-option label="企业内部几何量检测 v2.2 Draft" value="metrology" />
-          </el-select>
-          <span class="bh-sep">·</span>
-          <span class="bh-ver draft">Draft</span>
-        </div>
-        <div class="bh-title">流程设计器 <span class="bh-subtitle">Workflow Designer</span></div>
+  <div class="workflow-shell">
+    <header class="workflow-header">
+      <div class="header-context">
+        <div class="breadcrumb"><button @click="router.push('/app/scenarios/studio')">第三方食品理化检测</button><span>/</span><strong>检测流程</strong></div>
+        <div class="title-row"><h1>流程设计器</h1><span class="version-token">food-third-party-flow · v1.4 Draft</span><span class="status-token">由场景包发布时锁定</span></div>
       </div>
-      <div class="bh-actions">
-        <el-button size="small" plain><el-icon><RefreshLeft /></el-icon> 撤销</el-button>
-        <el-button size="small" plain>验证流程</el-button>
-        <el-button size="small">保存草稿</el-button>
-        <el-button type="primary" size="small">保存并发布</el-button>
+      <div class="header-actions">
+        <el-button size="small"><el-icon><RefreshLeft /></el-icon>撤销</el-button>
+        <el-button size="small" @click="showValidation = true">验证流程</el-button>
+        <el-button size="small">保存流程版本</el-button>
+        <el-button type="primary" size="small" @click="router.push('/app/scenarios/studio')">保存并返回场景</el-button>
       </div>
+    </header>
+
+    <div class="runtime-banner">
+      <el-icon><InfoFilled /></el-icon>
+      <span>Workflow Definition 只负责编排。每个节点必须解析到平台注册的 <strong>Node Type → Executor → Config Renderer / Runtime Renderer</strong>；场景发布时统一做 Preflight。</span>
     </div>
 
-    <div class="builder-body">
-      <!-- Left: Node Palette -->
-      <div class="palette">
-        <div class="palette-header">节点库 <span class="palette-hint">拖拽到画布</span></div>
-        <div v-for="grp in nodePalette" :key="grp.key" class="palette-group">
-          <div class="pg-label">{{ grp.label }}</div>
-          <div v-for="n in grp.nodes" :key="n.typeKey" class="palette-item" draggable="true">
-            <div class="pi-left">
-              <el-icon size="13"><component :is="n.icon" /></el-icon>
-              <div class="pi-text">
-                <div class="pi-name">{{ n.name }}</div>
-                <div class="pi-key">{{ n.typeKey }}</div>
-              </div>
-            </div>
-            <span :class="['pi-mode', modeClass(n.mode)]">{{ modeLabel(n.mode) }}</span>
+    <div class="workflow-body">
+      <aside class="palette-panel">
+        <div class="panel-title-row"><strong>节点库</strong><span>Node Type Registry</span></div>
+        <el-input v-model="nodeSearch" size="small" placeholder="搜索节点类型" prefix-icon="Search" clearable />
+        <div class="palette-groups">
+          <div v-for="group in filteredPalette" :key="group.key" class="palette-group">
+            <div class="group-label">{{ group.label }}</div>
+            <button v-for="node in group.nodes" :key="node.type" class="palette-node">
+              <el-icon><component :is="node.icon" /></el-icon>
+              <span class="palette-copy"><strong>{{ node.name }}</strong><small>{{ node.type }}</small></span>
+              <span class="mode-token">{{ modeShort(node.mode) }}</span>
+            </button>
           </div>
         </div>
-      </div>
+      </aside>
 
-      <!-- Center: Canvas -->
-      <div class="canvas-area" @click.self="selectedNodeId = null">
+      <main class="canvas-panel">
         <div class="canvas-toolbar">
-          <div class="ct-left">
-            <el-button-group size="small">
-              <el-button size="small">100%</el-button>
-              <el-button size="small">适应画布</el-button>
-            </el-button-group>
-            <el-divider direction="vertical" />
-            <el-radio-group v-model="showMode" size="small">
-              <el-radio-button value="swimlane">泳道</el-radio-button>
-              <el-radio-button value="sequence">顺序</el-radio-button>
-            </el-radio-group>
-          </div>
-          <div class="ct-right">
-            <span class="ct-note">
-              <el-icon size="11"><InfoFilled /></el-icon>
-              节点执行能力由平台注册的 Node Type Executor 提供，流程设计仅配置参数与连接
-            </span>
-          </div>
+          <div class="toolbar-left"><el-button-group size="small"><el-button>−</el-button><el-button>100%</el-button><el-button>+</el-button></el-button-group><el-button size="small">适应画布</el-button></div>
+          <div class="toolbar-right"><span class="validation-state ok"><el-icon><CircleCheck /></el-icon>Node Type 解析通过</span><span class="validation-state warn"><el-icon><Warning /></el-icon>1 个 SLA 警告</span></div>
         </div>
 
         <div class="canvas-scroll">
-          <!-- Swimlane mode -->
-          <div class="swimlane-canvas">
-            <!-- Start node -->
-            <div class="flow-row">
-              <div class="start-end-node">
-                <div class="se-circle start">START</div>
-              </div>
-              <div class="flow-arrow"><el-icon><ArrowRight /></el-icon></div>
-            </div>
-
-            <!-- Each lane -->
-            <div v-for="lane in flowLanes" :key="lane.id" class="swimlane">
-              <div class="sl-label-col">
-                <div class="sl-label">
-                  <span :class="['sl-dot', lane.color]"></span>
-                  {{ lane.label }}
-                </div>
-              </div>
-              <div class="sl-nodes">
-                <template v-for="(node, i) in lane.nodes" :key="node.id">
-                  <div
-                    class="flow-node"
-                    :class="[`mode-${node.mode}`, { selected: selectedNodeId === node.id }]"
-                    @click.stop="selectNode(node)"
-                  >
-                    <div class="fn-top">
-                      <el-icon size="12"><component :is="node.icon" /></el-icon>
-                      <span :class="['fn-mode-badge', node.mode]">{{ modeLabel(node.mode) }}</span>
-                    </div>
-                    <div class="fn-name">{{ node.name }}</div>
-                    <div class="fn-type">{{ node.typeKey }}</div>
-                    <div class="fn-bottom">
-                      <span class="fn-sla">{{ node.sla }}</span>
-                      <span class="fn-ai-dot" v-if="node.aiSkill" title="AI Skill 已挂载">
-                        <el-icon size="9" color="#526075"><MagicStick /></el-icon>
-                      </span>
-                    </div>
-                  </div>
-                  <div class="node-arrow" v-if="i < lane.nodes.length - 1">
-                    <el-icon size="12" color="#B0B9C6"><ArrowRight /></el-icon>
-                  </div>
+          <div class="process-canvas">
+            <div class="lane" v-for="lane in lanes" :key="lane.key">
+              <div class="lane-label"><strong>{{ lane.label }}</strong><span>{{ lane.description }}</span></div>
+              <div class="lane-track">
+                <template v-for="(node, index) in lane.nodes" :key="node.id">
+                  <button :class="['process-node', { selected: selectedNode?.id === node.id }]" @click="selectNode(node)">
+                    <div class="node-head"><el-icon><component :is="node.icon" /></el-icon><span class="mode-token">{{ modeShort(node.mode) }}</span></div>
+                    <strong>{{ node.name }}</strong>
+                    <small>{{ node.type }}</small>
+                    <div class="node-foot"><span>{{ node.sla || 'SLA 未设置' }}</span><span v-if="node.aiSkill" class="ai-hook">AI 辅助</span></div>
+                  </button>
+                  <el-icon v-if="index < lane.nodes.length - 1" class="node-arrow"><ArrowRight /></el-icon>
                 </template>
               </div>
             </div>
-
-            <!-- End node -->
-            <div class="flow-row end-row">
-              <div class="flow-arrow"><el-icon><ArrowRight /></el-icon></div>
-              <div class="start-end-node">
-                <div class="se-circle end">END</div>
-              </div>
-            </div>
           </div>
         </div>
-      </div>
+      </main>
 
-      <!-- Right: Inspector -->
-      <div class="inspector">
-        <div v-if="selectedNodeData" class="insp-content">
-          <!-- Node identity (readonly) -->
-          <div class="insp-section identity-section">
-            <div class="insp-node-name">{{ selectedNodeData.name }}</div>
-            <div class="insp-type-row">
-              <span class="insp-type-key">{{ selectedNodeData.typeKey }}</span>
-              <span :class="['fn-mode-badge', selectedNodeData.mode]">{{ modeLabel(selectedNodeData.mode) }}</span>
-            </div>
-          </div>
+      <aside class="inspector-panel">
+        <template v-if="selectedNode">
+          <div class="inspector-header"><div><strong>{{ selectedNode.name }}</strong><span>{{ selectedNode.type }}</span></div><span class="mode-token">{{ selectedNode.mode }}</span></div>
 
-          <!-- Technical info (readonly) -->
-          <div class="insp-section">
-            <div class="insp-sec-title">节点类型描述符 <span class="readonly-badge">只读</span></div>
-            <div class="insp-kv"><span class="ik">Node Type</span><span class="iv mono">{{ selectedNodeData.typeKey }}</span></div>
-            <div class="insp-kv"><span class="ik">Execution Mode</span><span :class="['iv fn-mode-badge', selectedNodeData.mode]">{{ modeLabel(selectedNodeData.mode) }}</span></div>
-            <div class="insp-kv"><span class="ik">Backend Executor</span><span class="iv mono muted">{{ selectedNodeData.executor }}</span></div>
-            <div class="insp-kv"><span class="ik">Config Renderer</span><span class="iv mono muted">{{ selectedNodeData.configRenderer }}</span></div>
-            <div class="insp-kv">
-              <span class="ik">Runtime Renderer</span>
-              <span class="iv mono" :class="selectedNodeData.renderer ? 'renderer-link' : 'muted'">
-                {{ selectedNodeData.renderer || '— (automated)' }}
-              </span>
-            </div>
-            <div class="insp-kv"><span class="ik">Source Module</span><span class="iv mono muted">{{ selectedNodeData.module }}</span></div>
-          </div>
+          <section class="inspector-section technical-section">
+            <div class="section-label">节点类型描述符 <span>只读</span></div>
+            <div class="kv"><span>Node Type</span><strong class="mono">{{ selectedNode.type }}</strong></div>
+            <div class="kv"><span>Execution Mode</span><strong>{{ selectedNode.mode }}</strong></div>
+            <div class="kv"><span>Backend Executor</span><strong class="mono">{{ selectedNode.executor }}</strong></div>
+            <div class="kv"><span>Config Renderer</span><strong class="mono">{{ selectedNode.configRenderer }}</strong></div>
+            <div class="kv"><span>Runtime Renderer</span><strong class="mono">{{ selectedNode.runtimeRenderer || '— automated —' }}</strong></div>
+            <div class="kv"><span>Source Module</span><strong class="mono">{{ selectedNode.module }}</strong></div>
+          </section>
 
-          <!-- Configuration -->
-          <div class="insp-section">
-            <div class="insp-sec-title">节点配置</div>
+          <section class="inspector-section">
+            <div class="section-label">节点配置</div>
             <el-form label-position="top" size="small">
-              <el-form-item label="节点显示名称">
-                <el-input v-model="selectedNodeData.name" />
-              </el-form-item>
-              <el-form-item label="执行角色">
-                <el-select v-model="selectedNodeData.role" style="width:100%" clearable placeholder="选择执行角色">
-                  <el-option label="受理员" value="acceptor" />
-                  <el-option label="收样员" value="receiver" />
-                  <el-option label="理化检测员-L1" value="lab-l1" />
-                  <el-option label="理化检测员-L2" value="lab-l2" />
-                  <el-option label="微生物检测员" value="micro" />
-                  <el-option label="技术负责人" value="tech-lead" />
-                  <el-option label="授权签字人" value="auth-signer" />
-                  <el-option label="现场采样员" value="field-sampler" />
-                </el-select>
-              </el-form-item>
-              <el-form-item label="SLA">
-                <el-input v-model="selectedNodeData.sla" placeholder="如：4h、1d、2h" />
-              </el-form-item>
-              <el-form-item label="进入条件">
-                <el-input type="textarea" v-model="selectedNodeData.entryCondition" :rows="2" placeholder="条件表达式或留空" />
-              </el-form-item>
-              <el-form-item label="完成条件">
-                <el-input type="textarea" v-model="selectedNodeData.exitCondition" :rows="2" placeholder="条件表达式或留空" />
-              </el-form-item>
+              <el-form-item label="显示名称"><el-input v-model="selectedNode.name" /></el-form-item>
+              <el-form-item label="执行角色" v-if="selectedNode.mode === 'HUMAN_TASK'"><el-select v-model="selectedNode.role" style="width:100%" clearable placeholder="选择角色"><el-option v-for="role in roles" :key="role" :label="role" :value="role" /></el-select></el-form-item>
+              <el-form-item label="SLA"><el-input v-model="selectedNode.sla" placeholder="例如 4h / 1d" /></el-form-item>
+              <el-form-item label="进入条件"><el-input v-model="selectedNode.entryRule" type="textarea" :rows="2" placeholder="可选：Rule / Expression" /></el-form-item>
+              <el-form-item label="完成条件"><el-input v-model="selectedNode.exitRule" type="textarea" :rows="2" placeholder="可选：Rule / Expression" /></el-form-item>
             </el-form>
-          </div>
+          </section>
 
-          <!-- Node-specific config -->
-          <div class="insp-section" v-if="selectedNodeData.specificConfig?.length">
-            <div class="insp-sec-title">节点特定参数</div>
-            <el-form label-position="top" size="small">
-              <div v-for="cfg in selectedNodeData.specificConfig" :key="cfg.key">
-                <el-form-item :label="cfg.label">
-                  <el-switch v-if="cfg.type === 'Boolean'" v-model="cfg.value" />
-                  <el-select v-else-if="cfg.type === 'Enum'" v-model="cfg.value" style="width:100%">
-                    <el-option v-for="opt in cfg.options" :key="opt" :label="opt" :value="opt" />
-                  </el-select>
-                  <el-input v-else v-model="cfg.value" />
-                </el-form-item>
-              </div>
-            </el-form>
-          </div>
+          <section class="inspector-section">
+            <div class="section-label">运行策略</div>
+            <div class="kv"><span>审计策略</span><el-select v-model="selectedNode.audit" size="small" style="width:150px"><el-option label="全量审计" value="FULL"/><el-option label="关键动作" value="KEY_ACTIONS"/></el-select></div>
+            <div class="kv"><span>超时策略</span><el-select v-model="selectedNode.timeout" size="small" style="width:150px"><el-option label="上报并挂起" value="ESCALATE_HOLD"/><el-option label="自动重试" value="RETRY"/></el-select></div>
+          </section>
 
-          <!-- AI Skill attachment -->
-          <div class="insp-section">
-            <div class="insp-sec-title">AI Skill 挂载</div>
-            <el-form label-position="top" size="small">
-              <el-form-item label="挂载 AI Skill">
-                <el-select v-model="selectedNodeData.aiSkill" style="width:100%" clearable placeholder="无">
-                  <el-option label="standard-match v1.2" value="standard-match" />
-                  <el-option label="report-draft v2.0" value="report-draft" />
-                  <el-option label="report-review v1.4" value="report-review" />
-                  <el-option label="anomaly-detect v1.0" value="anomaly-detect" />
-                  <el-option label="smart-schedule v0.8" value="smart-schedule" />
-                </el-select>
-              </el-form-item>
-              <el-form-item label="Human Approval Required" v-if="selectedNodeData.aiSkill">
-                <el-switch v-model="selectedNodeData.aiConfirm" />
-              </el-form-item>
-            </el-form>
-          </div>
-
-          <!-- Fail strategy -->
-          <div class="insp-section">
-            <div class="insp-sec-title">失败 / 超时策略</div>
-            <el-form label-position="top" size="small">
-              <el-form-item label="超时处理">
-                <el-select v-model="selectedNodeData.failStrategy" style="width:100%">
-                  <el-option label="上报上级" value="escalate" />
-                  <el-option label="挂起等待" value="hold" />
-                  <el-option label="跳过（仅警告）" value="skip" />
-                </el-select>
-              </el-form-item>
-              <el-form-item label="Audit Policy">
-                <el-select v-model="selectedNodeData.auditPolicy" style="width:100%">
-                  <el-option label="全量审计" value="full" />
-                  <el-option label="异常时审计" value="on-error" />
-                  <el-option label="不审计" value="none" />
-                </el-select>
-              </el-form-item>
-            </el-form>
-          </div>
-        </div>
-
-        <div v-else class="insp-empty">
-          <el-icon size="28" color="#D9DEE7"><Share /></el-icon>
-          <div class="insp-empty-text">点击画布节点<br>查看与配置属性</div>
-          <div class="insp-empty-hint">节点的 Executor 和 Renderer 来自 Node Type 注册表，不可在此修改</div>
-        </div>
-      </div>
+          <section class="inspector-section">
+            <div class="section-label">AI Skill Hook</div>
+            <el-select v-model="selectedNode.aiSkill" size="small" clearable placeholder="不挂载 AI Skill" style="width:100%"><el-option label="standard-match v1.2" value="standard-match"/><el-option label="anomaly-detect v1.0" value="anomaly-detect"/><el-option label="report-draft v2.0" value="report-draft"/><el-option label="report-review v1.4" value="report-review"/></el-select>
+            <div v-if="selectedNode.aiSkill" class="ai-policy"><el-icon><InfoFilled /></el-icon>AI 输出为建议或草稿；最终业务状态仍由规则与人工操作控制。</div>
+          </section>
+        </template>
+        <div v-else class="inspector-empty"><el-icon><Connection /></el-icon><strong>选择一个流程节点</strong><span>查看 Node Type、Executor 与 Renderer，并配置该节点在当前场景中的参数。</span></div>
+      </aside>
     </div>
+
+    <el-drawer v-model="showValidation" title="流程验证" size="420px">
+      <div class="validation-drawer">
+        <div class="validation-summary"><strong>6 项通过</strong><span class="warning-text">1 项警告</span></div>
+        <div v-for="item in validationItems" :key="item.name" class="validation-row"><span :class="['validation-icon', item.level]"><el-icon><component :is="item.level === 'ok' ? 'CircleCheck' : 'Warning'" /></el-icon></span><div><strong>{{ item.name }}</strong><span>{{ item.detail }}</span></div></div>
+        <div class="validation-note">Workflow 只有在场景包 Preflight 解析全部资产、Executor 与 Runtime Renderer 后，才可进入 Scenario Snapshot。</div>
+      </div>
+    </el-drawer>
   </div>
 </template>
-<script setup lang="ts">
-import { ref, computed } from 'vue'
 
-const activeScenario = ref('food')
-const selectedNodeId = ref<number | null>(null)
-const showMode = ref('swimlane')
+<script setup lang="ts">
+import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
+const nodeSearch = ref('')
+const showValidation = ref(false)
+const selectedNode = ref<any>(null)
+
+const roles = ['委托受理员', '收样员', '理化检测员 L1', '理化检测员 L2', '技术负责人', '授权签字人', '现场采样员']
 
 const nodePalette = [
-  {
-    key: 'flow-control', label: '流程控制',
-    nodes: [
-      { typeKey: 'START', name: '开始', icon: 'VideoPlay', mode: 'FLOW' },
-      { typeKey: 'END', name: '结束', icon: 'VideoPause', mode: 'FLOW' },
-      { typeKey: 'GATEWAY_CONDITION', name: '条件网关', icon: 'Share', mode: 'FLOW' },
-      { typeKey: 'GATEWAY_PARALLEL', name: '并行网关', icon: 'Connection', mode: 'FLOW' },
-      { typeKey: 'TIMER', name: '定时器', icon: 'Timer', mode: 'FLOW' },
-    ]
-  },
-  {
-    key: 'lab', label: '实验室通用',
-    nodes: [
-      { typeKey: 'REQUEST_ACCEPTANCE', name: '委托受理', icon: 'Document', mode: 'HUMAN_TASK' },
-      { typeKey: 'SAMPLE_RECEIPT', name: '收样', icon: 'Box', mode: 'HUMAN_TASK' },
-      { typeKey: 'SAMPLE_PREPARATION', name: '样品前处理', icon: 'Operation', mode: 'HUMAN_TASK' },
-      { typeKey: 'LAB_TEST_EXECUTION', name: '实验室检测', icon: 'Monitor', mode: 'HUMAN_TASK' },
-      { typeKey: 'TECHNICAL_REVIEW', name: '技术审核', icon: 'Finished', mode: 'HUMAN_TASK' },
-      { typeKey: 'REPORT_GENERATION', name: '报告生成', icon: 'Printer', mode: 'SERVICE_TASK' },
-      { typeKey: 'REPORT_REVIEW', name: '报告审核', icon: 'Reading', mode: 'HUMAN_TASK' },
-      { typeKey: 'REPORT_RELEASE', name: '报告签发', icon: 'Upload', mode: 'HUMAN_TASK' },
-    ]
-  },
-  {
-    key: 'field', label: '现场作业',
-    nodes: [
-      { typeKey: 'SAMPLING_PLAN', name: '采样方案', icon: 'Calendar', mode: 'HUMAN_TASK' },
-      { typeKey: 'FIELD_SAMPLING', name: '现场采样', icon: 'Location', mode: 'HUMAN_TASK' },
-      { typeKey: 'ONSITE_INSPECTION', name: '客户现场检测', icon: 'Aim', mode: 'HUMAN_TASK' },
-    ]
-  },
-  {
-    key: 'specialized', label: '专业检测',
-    nodes: [
-      { typeKey: 'METROLOGY_MEASUREMENT', name: '几何量测量', icon: 'Aim', mode: 'HUMAN_TASK' },
-      { typeKey: 'INSTRUMENT_DATA_COLLECT', name: '仪器数据采集', icon: 'DataLine', mode: 'SERVICE_TASK' },
-    ]
-  },
-  {
-    key: 'auto', label: '自动化',
-    nodes: [
-      { typeKey: 'RULE_NODE', name: 'Rule Node', icon: 'Setting', mode: 'RULE_TASK' },
-      { typeKey: 'AI_NODE', name: 'AI Node', icon: 'MagicStick', mode: 'AI_TASK' },
-      { typeKey: 'INTEGRATION_NODE', name: 'Integration Node', icon: 'Connection', mode: 'SERVICE_TASK' },
-    ]
-  },
+  { key: 'control', label: '流程控制', nodes: [
+    { type: 'GATEWAY_CONDITION', name: '条件网关', icon: 'Share', mode: 'RULE' },
+    { type: 'TIMER', name: '定时 / SLA', icon: 'Clock', mode: 'TIMER' },
+    { type: 'SUBPROCESS', name: '子流程', icon: 'Connection', mode: 'SUBPROCESS' },
+  ]},
+  { key: 'lab', label: '实验室通用', nodes: [
+    { type: 'REQUEST_ACCEPTANCE', name: '委托受理', icon: 'Document', mode: 'HUMAN_TASK' },
+    { type: 'SAMPLE_RECEIPT', name: '收样', icon: 'Box', mode: 'HUMAN_TASK' },
+    { type: 'LAB_TEST_EXECUTION', name: '实验室检测', icon: 'Monitor', mode: 'HUMAN_TASK' },
+    { type: 'TECHNICAL_REVIEW', name: '技术审核', icon: 'Finished', mode: 'HUMAN_TASK' },
+    { type: 'REPORT_GENERATION', name: '报告生成', icon: 'Files', mode: 'JAVA_SERVICE' },
+  ]},
+  { key: 'field', label: '现场作业', nodes: [
+    { type: 'FIELD_SAMPLING', name: '现场采样', icon: 'Location', mode: 'HUMAN_TASK' },
+    { type: 'ONSITE_INSPECTION', name: '客户现场检测', icon: 'Aim', mode: 'HUMAN_TASK' },
+  ]},
+  { key: 'automation', label: '自动化能力', nodes: [
+    { type: 'RULE_EVALUATION', name: '规则判定', icon: 'DataAnalysis', mode: 'RULE' },
+    { type: 'INTEGRATION_CALL', name: '系统集成', icon: 'Link', mode: 'INTEGRATION' },
+    { type: 'AI_SKILL', name: 'AI Skill', icon: 'Cpu', mode: 'AI' },
+  ]},
 ]
 
-const flowLanes = ref([
-  {
-    id: 1, label: '业务链路', color: 'blue',
-    nodes: [
-      {
-        id: 1, name: '委托受理', typeKey: 'REQUEST_ACCEPTANCE', mode: 'HUMAN_TASK',
-        icon: 'Document', executor: 'requestAcceptanceExecutor', configRenderer: 'request-acceptance-config',
-        renderer: 'request-acceptance-workbench', module: 'capability-lab-core',
-        sla: '4h', role: 'acceptor', entryCondition: '', exitCondition: '委托方信息完整 && 检测项已确认',
-        aiSkill: 'standard-match', aiConfirm: true, failStrategy: 'escalate', auditPolicy: 'full',
-        specificConfig: [
-          { key: 'requireClientSign', label: '要求客户签字确认', type: 'Boolean', value: true },
-        ]
-      },
-      {
-        id: 2, name: '收样', typeKey: 'SAMPLE_RECEIPT', mode: 'HUMAN_TASK',
-        icon: 'Box', executor: 'sampleReceiptExecutor', configRenderer: 'sample-receipt-config',
-        renderer: 'sample-receipt-workbench', module: 'capability-lab-core',
-        sla: '2h', role: 'receiver', entryCondition: '', exitCondition: '样品编号已登记 && 条形码已打印',
-        aiSkill: null, aiConfirm: false, failStrategy: 'hold', auditPolicy: 'full',
-        specificConfig: [
-          { key: 'requireBarcode', label: '必须扫码入库', type: 'Boolean', value: true },
-          { key: 'storageTemp', label: '样品存储要求', type: 'Enum', value: '0~4°C 冷藏', options: ['常温', '0~4°C 冷藏', '-20°C 冷冻', '避光'] },
-        ]
-      },
-    ]
-  },
-  {
-    id: 2, label: '专业检测', color: 'green',
-    nodes: [
-      {
-        id: 3, name: '样品前处理', typeKey: 'SAMPLE_PREPARATION', mode: 'HUMAN_TASK',
-        icon: 'Operation', executor: 'samplePrepExecutor', configRenderer: 'sample-prep-config',
-        renderer: 'sample-prep-workbench', module: 'capability-lab-core',
-        sla: '4h', role: 'lab-l1', entryCondition: '收样完成', exitCondition: '前处理记录已提交',
-        aiSkill: null, aiConfirm: false, failStrategy: 'hold', auditPolicy: 'on-error',
-        specificConfig: []
-      },
-      {
-        id: 4, name: '实验室检测', typeKey: 'LAB_TEST_EXECUTION', mode: 'HUMAN_TASK',
-        icon: 'Monitor', executor: 'labTestExecutor', configRenderer: 'lab-test-config',
-        renderer: 'lab-test-workbench', module: 'capability-lab-core',
-        sla: '2d', role: 'lab-l2', entryCondition: '前处理完成', exitCondition: '所有检测项结果已录入',
-        aiSkill: 'anomaly-detect', aiConfirm: false, failStrategy: 'hold', auditPolicy: 'full',
-        specificConfig: [
-          { key: 'requireEquipCalib', label: '要求设备校准有效', type: 'Boolean', value: true },
-        ]
-      },
-    ]
-  },
-  {
-    id: 3, label: '审核与签发', color: 'orange',
-    nodes: [
-      {
-        id: 5, name: '技术审核', typeKey: 'TECHNICAL_REVIEW', mode: 'HUMAN_TASK',
-        icon: 'Finished', executor: 'technicalReviewExecutor', configRenderer: 'tech-review-config',
-        renderer: 'review-center-workbench', module: 'capability-review',
-        sla: '8h', role: 'tech-lead', entryCondition: '检测完成', exitCondition: '审核结论已提交',
-        aiSkill: 'report-review', aiConfirm: true, failStrategy: 'escalate', auditPolicy: 'full',
-        specificConfig: [
-          { key: 'requireAIAssist', label: '启用 AI 审核辅助', type: 'Boolean', value: true },
-          { key: 'minReviewerLevel', label: '最低审核人等级', type: 'Enum', value: 'L3', options: ['L2', 'L3', 'L4', '技术负责人'] },
-        ]
-      },
-      {
-        id: 6, name: '报告生成', typeKey: 'REPORT_GENERATION', mode: 'SERVICE_TASK',
-        icon: 'Printer', executor: 'reportGenerationExecutor', configRenderer: 'report-gen-config',
-        renderer: null, module: 'capability-report',
-        sla: '0.5h', role: '', entryCondition: '技术审核通过', exitCondition: '报告草稿生成完毕',
-        aiSkill: 'report-draft', aiConfirm: true, failStrategy: 'escalate', auditPolicy: 'full',
-        specificConfig: [
-          { key: 'autoPopulate', label: '自动填充检测数据', type: 'Boolean', value: true },
-        ]
-      },
-      {
-        id: 7, name: '报告签发', typeKey: 'REPORT_RELEASE', mode: 'HUMAN_TASK',
-        icon: 'Upload', executor: 'reportReleaseExecutor', configRenderer: 'report-release-config',
-        renderer: 'report-release-workbench', module: 'capability-review',
-        sla: '2h', role: 'auth-signer', entryCondition: '报告草稿已生成', exitCondition: '授权签字完成',
-        aiSkill: null, aiConfirm: false, failStrategy: 'escalate', auditPolicy: 'full',
-        specificConfig: []
-      },
-    ]
-  },
-])
-
-const selectedNodeData = computed(() => {
-  if (selectedNodeId.value === null) return null
-  for (const lane of flowLanes.value) {
-    const n = lane.nodes.find(n => n.id === selectedNodeId.value)
-    if (n) return n
-  }
-  return null
+const filteredPalette = computed(() => {
+  const q = nodeSearch.value.trim().toLowerCase()
+  if (!q) return nodePalette
+  return nodePalette.map(group => ({ ...group, nodes: group.nodes.filter(n => `${n.name} ${n.type}`.toLowerCase().includes(q)) })).filter(group => group.nodes.length)
 })
 
-function selectNode(node: any) { selectedNodeId.value = node.id }
+const makeNode = (id: number, name: string, type: string, mode: string, icon: string, executor: string, runtimeRenderer: string | null, role = '', sla = '') => ({
+  id, name, type, mode, icon, executor, configRenderer: `${type.toLowerCase().replaceAll('_','-')}-config`, runtimeRenderer, module: type.startsWith('FIELD_') ? 'domain-field-operation' : 'domain-laboratory', role, sla, entryRule: '', exitRule: '', audit: 'FULL', timeout: 'ESCALATE_HOLD', aiSkill: '',
+})
 
-function modeLabel(mode: string) {
-  const m: Record<string, string> = {
-    HUMAN_TASK: 'Human', SERVICE_TASK: 'Service', AI_TASK: 'AI', RULE_TASK: 'Rule', FLOW: 'Flow'
-  }
-  return m[mode] || mode
-}
+const lanes = ref([
+  { key: 'intake', label: '委托与收样', description: '客户 / 受理人员', nodes: [
+    makeNode(1, '委托受理', 'REQUEST_ACCEPTANCE', 'HUMAN_TASK', 'Document', 'requestAcceptanceExecutor', 'request-acceptance-workbench', '委托受理员', '2h'),
+    makeNode(2, '收样', 'SAMPLE_RECEIPT', 'HUMAN_TASK', 'Box', 'sampleReceiptExecutor', 'sample-receipt-workbench', '收样员', '4h'),
+  ]},
+  { key: 'execution', label: '检测执行', description: '检测人员 / 设备', nodes: [
+    makeNode(3, '样品前处理', 'SAMPLE_PREPARATION', 'HUMAN_TASK', 'Operation', 'samplePreparationExecutor', 'sample-preparation-workbench', '理化检测员 L1', ''),
+    makeNode(4, '实验室检测', 'LAB_TEST_EXECUTION', 'HUMAN_TASK', 'Monitor', 'labTestExecutor', 'test-execution-workbench', '理化检测员 L2', '1d'),
+  ]},
+  { key: 'review', label: '审核与交付', description: '技术负责人 / 授权签字人', nodes: [
+    makeNode(5, '技术审核', 'TECHNICAL_REVIEW', 'HUMAN_TASK', 'Finished', 'technicalReviewExecutor', 'review-workbench', '技术负责人', '4h'),
+    makeNode(6, '报告生成', 'REPORT_GENERATION', 'JAVA_SERVICE', 'Files', 'reportGenerationExecutor', null, '', '30m'),
+    makeNode(7, '报告签发', 'REPORT_RELEASE', 'HUMAN_TASK', 'DocumentChecked', 'reportReleaseExecutor', 'report-release-workbench', '授权签字人', '4h'),
+  ]},
+])
 
-function modeClass(mode: string) {
-  const m: Record<string, string> = {
-    HUMAN_TASK: 'human', SERVICE_TASK: 'service', AI_TASK: 'ai', RULE_TASK: 'rule', FLOW: 'flow'
-  }
-  return m[mode] || ''
+selectedNode.value = lanes.value[1].nodes[0]
+
+const validationItems = [
+  { level: 'ok', name: '开始 / 结束路径', detail: '所有节点可从入口到达并可到达终点。' },
+  { level: 'ok', name: 'Node Type Registry', detail: '7 个节点类型均已注册。' },
+  { level: 'ok', name: 'Backend Executor', detail: '所有节点均解析到可用 Executor。' },
+  { level: 'ok', name: 'Runtime Renderer', detail: '所有 HUMAN_TASK 均存在运行态工作台。' },
+  { level: 'warn', name: 'SLA', detail: '样品前处理节点未设置 SLA。' },
+  { level: 'ok', name: '角色权限', detail: '所有人工节点均配置执行角色。' },
+  { level: 'ok', name: '循环与死锁', detail: '未发现非法循环或不可达节点。' },
+]
+
+function selectNode(node: any) { selectedNode.value = node }
+function modeShort(mode: string) {
+  const map: Record<string,string> = { HUMAN_TASK: 'Human', JAVA_SERVICE: 'Java', RULE: 'Rule', INTEGRATION: 'Integration', AI: 'AI', TIMER: 'Timer', SUBPROCESS: 'Subprocess' }
+  return map[mode] || mode
 }
 </script>
+
 <style scoped>
-.builder-shell { display: flex; flex-direction: column; height: 100%; overflow: hidden; background: #F5F7FA; }
-
-.builder-header {
-  background: #fff; border-bottom: 1px solid #D9DEE7;
-  padding: 8px 20px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
-}
-.bh-left { display: flex; flex-direction: column; gap: 3px; }
-.bh-context { display: flex; align-items: center; gap: 8px; }
-.bh-scene-label { font-size: 12px; color: #8A96A6; }
-.bh-sep { color: #D9DEE7; }
-.bh-ver { font-size: 11px; padding: 1px 7px; border-radius: 3px; font-family: monospace; font-weight: 500; }
-.bh-ver.draft { background: #FFF3E0; color: #A9650A; border: 1px solid #FFD591; }
-.bh-title { font-size: 15px; font-weight: 600; color: #0B1220; }
-.bh-subtitle { font-size: 13px; font-weight: 400; color: #8A96A6; margin-left: 6px; }
-.bh-actions { display: flex; gap: 6px; }
-
-.builder-body { display: flex; flex: 1; overflow: hidden; }
-
-/* Palette */
-.palette {
-  width: 240px; background: #fff; border-right: 1px solid #D9DEE7;
-  overflow-y: auto; flex-shrink: 0; padding: 10px 0;
-}
-.palette-header { font-size: 11px; font-weight: 600; color: #526075; padding: 0 12px 8px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; justify-content: space-between; align-items: center; }
-.palette-hint { font-size: 10px; color: #B0B9C6; font-weight: 400; text-transform: none; letter-spacing: 0; }
-.palette-group { margin-bottom: 12px; }
-.pg-label { font-size: 10px; color: #B0B9C6; padding: 4px 12px 4px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 500; }
-.palette-item {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 6px 12px; cursor: grab; margin: 0 6px; border-radius: 3px;
-}
-.palette-item:hover { background: #F5F7FA; }
-.pi-left { display: flex; align-items: center; gap: 7px; flex: 1; min-width: 0; }
-.pi-text { flex: 1; min-width: 0; }
-.pi-name { font-size: 12px; color: #0B1220; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pi-key { font-size: 10px; font-family: monospace; color: #B0B9C6; }
-
-/* Mode badges (shared) */
-.fn-mode-badge, .pi-mode {
-  font-size: 9px; padding: 1px 5px; border-radius: 2px; font-weight: 600;
-  white-space: nowrap; flex-shrink: 0;
-}
-.fn-mode-badge.HUMAN_TASK, .pi-mode.human { background: #EDF4FF; color: #1677FF; }
-.fn-mode-badge.SERVICE_TASK, .pi-mode.service { background: #F0FFF4; color: #18794E; }
-.fn-mode-badge.AI_TASK, .pi-mode.ai { background: #F5F0FF; color: #526075; }
-.fn-mode-badge.RULE_TASK, .pi-mode.rule { background: #FFF3E0; color: #A9650A; }
-.fn-mode-badge.FLOW, .pi-mode.flow { background: #F5F7FA; color: #8A96A6; }
-
-/* Canvas */
-.canvas-area { flex: 1; display: flex; flex-direction: column; background: #F0F2F5; overflow: hidden; position: relative; }
-.canvas-toolbar {
-  height: 38px; background: #fff; border-bottom: 1px solid #D9DEE7;
-  display: flex; align-items: center; justify-content: space-between; padding: 0 14px; flex-shrink: 0;
-}
-.ct-left { display: flex; align-items: center; gap: 10px; }
-.ct-right { font-size: 11px; color: #B0B9C6; display: flex; align-items: center; gap: 4px; }
-.ct-note { display: flex; align-items: center; gap: 4px; }
-.canvas-scroll { flex: 1; overflow: auto; padding: 28px 32px; }
-.swimlane-canvas { display: flex; flex-direction: column; gap: 0; min-width: 900px; }
-
-.flow-row { display: flex; align-items: center; padding: 0 0 12px 0; }
-.end-row { padding-top: 12px; padding-bottom: 0; }
-.flow-arrow { color: #B0B9C6; display: flex; align-items: center; padding: 0 4px; }
-.start-end-node { display: flex; align-items: center; }
-.se-circle {
-  width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center;
-  justify-content: center; font-size: 9px; font-weight: 700; letter-spacing: 0.3px;
-}
-.se-circle.start { background: #1677FF; color: #fff; }
-.se-circle.end { background: #0B1220; color: #fff; }
-
-.swimlane { display: flex; border-left: 3px solid #E7EAF0; margin-left: 20px; margin-bottom: 4px; }
-.sl-label-col { width: 120px; flex-shrink: 0; padding: 14px 10px 14px 12px; border-right: 1px solid #E7EAF0; }
-.sl-label { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; color: #526075; text-transform: uppercase; letter-spacing: 0.5px; }
-.sl-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.sl-dot.blue { background: #1677FF; }
-.sl-dot.green { background: #18794E; }
-.sl-dot.orange { background: #A9650A; }
-.sl-nodes { display: flex; align-items: center; gap: 0; padding: 12px 16px; flex-wrap: wrap; }
-.node-arrow { padding: 0 6px; color: #B0B9C6; display: flex; align-items: center; }
-
-/* Canvas nodes */
-.flow-node {
-  width: 120px; min-height: 80px; border: 1.5px solid #D9DEE7; border-radius: 4px;
-  background: #fff; padding: 9px 10px; cursor: pointer; display: flex; flex-direction: column;
-  gap: 4px; transition: border-color 0.12s;
-}
-.flow-node:hover { border-color: #1677FF; }
-.flow-node.selected { border-color: #1677FF; box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.12); }
-.flow-node.mode-HUMAN_TASK { border-top: 3px solid #1677FF; }
-.flow-node.mode-SERVICE_TASK { border-top: 3px solid #18794E; }
-.flow-node.mode-AI_TASK { border-top: 3px solid #526075; }
-.flow-node.mode-RULE_TASK { border-top: 3px solid #A9650A; }
-.fn-top { display: flex; align-items: center; justify-content: space-between; }
-.fn-name { font-size: 12px; font-weight: 600; color: #0B1220; line-height: 1.3; }
-.fn-type { font-size: 9px; font-family: monospace; color: #B0B9C6; }
-.fn-bottom { display: flex; align-items: center; justify-content: space-between; margin-top: auto; }
-.fn-sla { font-size: 10px; color: #8A96A6; background: #F5F7FA; padding: 1px 4px; border-radius: 2px; }
-.fn-ai-dot { display: flex; align-items: center; }
-
-/* Inspector */
-.inspector {
-  width: 300px; background: #fff; border-left: 1px solid #D9DEE7;
-  overflow-y: auto; flex-shrink: 0;
-}
-.insp-content { padding: 0; }
-.insp-section {
-  padding: 14px 16px; border-bottom: 1px solid #E7EAF0;
-}
-.insp-section:last-child { border-bottom: none; }
-.identity-section { background: #F8FAFB; }
-.insp-node-name { font-size: 15px; font-weight: 600; color: #0B1220; margin-bottom: 6px; }
-.insp-type-row { display: flex; align-items: center; gap: 8px; }
-.insp-type-key { font-size: 11px; font-family: monospace; color: #526075; }
-.insp-sec-title {
-  font-size: 11px; font-weight: 600; color: #526075; text-transform: uppercase;
-  letter-spacing: 0.5px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;
-}
-.readonly-badge { font-size: 9px; color: #B0B9C6; background: #F5F7FA; padding: 1px 5px; border-radius: 2px; text-transform: none; letter-spacing: 0; font-weight: 400; }
-.insp-kv { display: flex; align-items: flex-start; gap: 0; margin-bottom: 6px; }
-.ik { width: 110px; font-size: 11px; color: #8A96A6; flex-shrink: 0; padding-top: 2px; }
-.iv { font-size: 12px; color: #0B1220; flex: 1; }
-.iv.mono { font-family: monospace; font-size: 10px; }
-.iv.muted { color: #8A96A6; }
-.renderer-link { color: #1677FF; cursor: pointer; }
-.renderer-link:hover { text-decoration: underline; }
-
-.insp-empty {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  padding: 40px 20px; text-align: center; height: 100%;
-}
-.insp-empty-text { font-size: 13px; color: #8A96A6; margin: 12px 0 8px; line-height: 1.6; }
-.insp-empty-hint { font-size: 11px; color: #B0B9C6; line-height: 1.5; }
+.workflow-shell { min-height: 100%; background: var(--ui-canvas); color: var(--ui-text); }
+.workflow-header { min-height: 64px; background: var(--ui-surface); border-bottom: 1px solid var(--ui-border); display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; gap: 16px; }
+.breadcrumb { display: flex; gap: 6px; align-items: center; font-size: 11px; color: var(--ui-text-tertiary); }.breadcrumb button { border:0;background:transparent;color:var(--ui-action-text);cursor:pointer;font:inherit;padding:0; }.title-row { display:flex;align-items:center;gap:8px;margin-top:4px; }.title-row h1 { margin:0;font-size:16px;font-weight:600; }.version-token,.status-token,.mode-token { border:1px solid var(--ui-border);background:var(--ui-surface-muted);color:var(--ui-text-secondary);border-radius:3px;padding:2px 6px;font-size:10px;line-height:16px; }.version-token { font-family:var(--ui-font-mono); }.header-actions { display:flex;gap:8px;align-items:center; }
+.runtime-banner { min-height:36px;padding:8px 16px;background:var(--ui-selected-bg);border-bottom:1px solid var(--ui-border);display:flex;align-items:center;gap:7px;color:var(--ui-text-secondary);font-size:11px; }
+.workflow-body { display:grid;grid-template-columns:230px minmax(0,1fr) 310px;height:calc(100vh - 148px);min-height:560px; }
+.palette-panel,.inspector-panel { background:var(--ui-surface);overflow:auto; }.palette-panel { border-right:1px solid var(--ui-border);padding:12px; }.inspector-panel { border-left:1px solid var(--ui-border); }.panel-title-row { display:flex;justify-content:space-between;align-items:center;margin-bottom:10px; }.panel-title-row strong { font-size:13px; }.panel-title-row span { font-size:9px;color:var(--ui-text-tertiary);font-family:var(--ui-font-mono); }.palette-groups { margin-top:12px; }.palette-group { margin-bottom:16px; }.group-label { font-size:10px;color:var(--ui-text-tertiary);font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px; }.palette-node { width:100%;border:1px solid transparent;background:transparent;border-radius:4px;padding:7px 6px;display:grid;grid-template-columns:18px minmax(0,1fr) auto;gap:6px;align-items:center;text-align:left;color:var(--ui-text-secondary);cursor:grab;font:inherit; }.palette-node:hover { background:var(--ui-surface-muted);border-color:var(--ui-border-subtle); }.palette-copy { min-width:0;display:flex;flex-direction:column; }.palette-copy strong { color:var(--ui-text);font-size:11px;font-weight:500; }.palette-copy small { font-size:8px;color:var(--ui-text-tertiary);font-family:var(--ui-font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.canvas-panel { min-width:0;display:flex;flex-direction:column;overflow:hidden; }.canvas-toolbar { min-height:46px;background:var(--ui-surface);border-bottom:1px solid var(--ui-border);display:flex;align-items:center;justify-content:space-between;padding:7px 10px; }.toolbar-left,.toolbar-right { display:flex;align-items:center;gap:8px; }.validation-state { display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:500; }.validation-state.ok { color:var(--ui-success); }.validation-state.warn,.warning-text { color:var(--ui-warning); }
+.canvas-scroll { flex:1;overflow:auto;padding:24px; }.process-canvas { min-width:760px;background-image:linear-gradient(var(--ui-border-subtle) 1px,transparent 1px),linear-gradient(90deg,var(--ui-border-subtle) 1px,transparent 1px);background-size:24px 24px;border:1px solid var(--ui-border-subtle);border-radius:4px;padding:16px;background-color:var(--ui-surface); }.lane { display:grid;grid-template-columns:130px minmax(0,1fr);min-height:132px;border-bottom:1px solid var(--ui-border-subtle); }.lane:last-child { border-bottom:0; }.lane-label { border-right:1px solid var(--ui-border);padding:14px 12px;display:flex;flex-direction:column;gap:3px; }.lane-label strong { font-size:11px; }.lane-label span { color:var(--ui-text-tertiary);font-size:9px; }.lane-track { display:flex;align-items:center;gap:8px;padding:16px;overflow-x:auto; }.process-node { flex:0 0 156px;min-height:92px;background:var(--ui-surface);border:1px solid var(--ui-border);border-radius:4px;padding:9px;text-align:left;color:var(--ui-text);cursor:pointer;font:inherit;box-shadow:none; }.process-node:hover { border-color:var(--ui-border-strong); }.process-node.selected { border-color:var(--ui-brand);box-shadow:0 0 0 1px var(--ui-brand) inset; }.node-head { display:flex;justify-content:space-between;align-items:center;color:var(--ui-text-secondary);margin-bottom:7px; }.process-node > strong { display:block;font-size:11px;font-weight:600;margin-bottom:3px; }.process-node > small { display:block;color:var(--ui-text-tertiary);font-size:8px;font-family:var(--ui-font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }.node-foot { border-top:1px solid var(--ui-border-subtle);margin-top:8px;padding-top:6px;display:flex;align-items:center;justify-content:space-between;color:var(--ui-text-tertiary);font-size:9px; }.ai-hook { color:var(--ui-action-text); }.node-arrow { color:var(--ui-text-tertiary);flex:0 0 auto; }
+.inspector-header { padding:13px 14px;border-bottom:1px solid var(--ui-border);display:flex;justify-content:space-between;align-items:flex-start;gap:8px; }.inspector-header > div { display:flex;flex-direction:column;gap:3px; }.inspector-header strong { font-size:13px; }.inspector-header span { font-size:9px;color:var(--ui-text-tertiary);font-family:var(--ui-font-mono); }.inspector-section { padding:13px 14px;border-bottom:1px solid var(--ui-border-subtle); }.technical-section { background:var(--ui-surface-muted); }.section-label { font-size:10px;font-weight:600;color:var(--ui-text-secondary);margin-bottom:10px;text-transform:uppercase;letter-spacing:.04em; }.section-label > span { font-weight:400;color:var(--ui-text-tertiary);text-transform:none;letter-spacing:0; }.kv { display:grid;grid-template-columns:105px minmax(0,1fr);gap:8px;align-items:center;min-height:27px;border-bottom:1px solid var(--ui-border-subtle);font-size:10px; }.kv:last-child { border-bottom:0; }.kv > span { color:var(--ui-text-tertiary); }.kv strong { font-weight:500;overflow-wrap:anywhere; }.mono { font-family:var(--ui-font-mono);font-size:9px; }.ai-policy { margin-top:8px;padding:8px;background:var(--ui-selected-bg);border:1px solid var(--ui-border-subtle);border-radius:4px;color:var(--ui-text-secondary);font-size:10px;line-height:1.45;display:flex;gap:5px; }.inspector-empty { height:100%;min-height:260px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;color:var(--ui-text-tertiary);gap:7px; }.inspector-empty .el-icon { font-size:26px;color:var(--ui-border-strong); }.inspector-empty strong { color:var(--ui-text-secondary);font-size:12px; }.inspector-empty span { max-width:230px;font-size:10px;line-height:1.5; }
+.validation-drawer { padding:0 4px; }.validation-summary { display:flex;gap:12px;padding:10px 12px;background:var(--ui-surface-muted);border:1px solid var(--ui-border);border-radius:4px;margin-bottom:12px;font-size:12px; }.validation-row { display:grid;grid-template-columns:20px minmax(0,1fr);gap:8px;padding:10px 2px;border-bottom:1px solid var(--ui-border-subtle); }.validation-icon.ok { color:var(--ui-success); }.validation-icon.warn { color:var(--ui-warning); }.validation-row div { display:flex;flex-direction:column;gap:2px; }.validation-row strong { font-size:11px; }.validation-row span { font-size:10px;color:var(--ui-text-secondary); }.validation-note { margin-top:14px;color:var(--ui-text-tertiary);font-size:10px;line-height:1.5; }
+@media(max-width:1200px){.workflow-body{grid-template-columns:200px minmax(0,1fr) 280px}.workflow-header{align-items:flex-start;flex-direction:column}.workflow-body{height:calc(100vh - 190px)}}
 </style>
