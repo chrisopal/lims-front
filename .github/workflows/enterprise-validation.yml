@@ -47,6 +47,11 @@ jobs:
           set -euo pipefail
           pnpm build 2>&1 | tee qa-artifacts/build.log
           tar -cf qa-artifacts/dist.tar dist
+      - name: Runtime contract typecheck and domain tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm test:runtime 2>&1 | tee qa-artifacts/runtime-domain.log
       - name: Install isolated browser test tooling
         shell: bash
         run: |
@@ -73,6 +78,7 @@ jobs:
           RESULT=0
           node scripts/qa/browser-check.mjs 2>&1 | tee qa-artifacts/browser.log || RESULT=1
           node scripts/qa/interaction-check.mjs 2>&1 | tee qa-artifacts/interaction.log || RESULT=1
+          node scripts/qa/runtime-browser-check.mjs 2>&1 | tee qa-artifacts/runtime-browser.log || RESULT=1
           exit "$RESULT"
       - name: Upload evidence even when a check fails
         if: always()
