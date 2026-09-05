@@ -1,0 +1,155 @@
+/* Scoped layout corrections verified by scripts/qa/browser-check.mjs.
+   Professional tables/canvases own horizontal scrolling; the page never does. */
+.app-layout .main-content > .page:has(.work-tabs) .page-header {
+  padding-right: 12px; gap: 12px;
+}
+.app-layout .fsw-main,
+.app-layout .ws-main,
+.app-layout .catalog-main,
+.app-layout .scenario-inspector { min-width: 0; }
+.app-layout .fsw-body,
+.app-layout .ws-body { min-height: 0; }
+.app-layout .workflow-shell .palette-copy small,
+.app-layout .workflow-shell .process-node > small,
+.app-layout .workflow-shell .node-foot,
+.app-layout .workflow-shell .lane-label span { font-size: 11px; }
+.app-layout .workflow-shell .palette-copy strong,
+.app-layout .workflow-shell .process-node > strong { font-size: 13px; }
+.app-layout .workflow-shell .kv,
+.app-layout .workflow-shell .section-label { font-size: 12px; }
+
+/* Only these application-owned Portal contents are affected. */
+.el-drawer:has(.drawer-shell),
+.el-drawer:has(.validation-drawer) { max-width: 100vw; }
+.el-dialog:has(.complete-checklist) { max-width: calc(100vw - 32px); }
+
+@media (max-width: 767px) {
+  .app-layout .main-content > .page,
+  .app-layout .main-content > .catalog-page { padding: 16px; }
+  .app-layout .main-content > .page .page-header,
+  .app-layout .catalog-page .page-header { flex-direction: column; gap: 12px; }
+  .app-layout .main-content .header-actions,
+  .app-layout .main-content .head-actions { flex-wrap: wrap; gap: 8px; }
+  .app-layout .main-content .header-actions .el-button + .el-button,
+  .app-layout .main-content .head-actions .el-button + .el-button { margin-left: 0; }
+  .app-layout .main-content > .page .filter-bar,
+  .app-layout .catalog-page .filter-bar,
+  .app-layout .composer-shell .filter-bar { height: auto; flex-wrap: wrap; align-items: flex-start; }
+  .app-layout .main-content > .page .filter-bar > .el-input,
+  .app-layout .main-content > .page .filter-bar > .el-select,
+  .app-layout .catalog-page .filter-bar > .el-input,
+  .app-layout .catalog-page .filter-bar > .el-select,
+  .app-layout .composer-shell .filter-bar > .el-input,
+  .app-layout .composer-shell .filter-bar > .el-select { width: 100% !important; max-width: 100%; }
+  .app-layout .main-content > .page .work-tabs { overflow-x: auto; }
+  .app-layout .main-content > .page .work-tab { flex: 0 0 auto; }
+  .app-layout .main-content > .page .table-wrap { max-width: 100%; overflow-x: auto; }
+  .app-layout .catalog-page .result-count { margin-left: 0; }
+
+  /* Scenario lifecycle becomes a compact scrollable step strip, not 11 rows
+     occupying the entire phone viewport. All steps remain accessible. */
+  .app-layout .studio-shell .studio-header {
+    height: auto; min-height: 64px; position: static;
+    flex-direction: column; align-items: stretch; gap: 12px; padding: 16px;
+  }
+  .app-layout .studio-shell .header-left { align-items: flex-start; }
+  .app-layout .studio-shell .header-left > div { min-width: 0; }
+  .app-layout .studio-shell .back-link { flex-shrink: 0; white-space: nowrap; }
+  .app-layout .studio-shell .title-row,
+  .app-layout .studio-shell .header-meta { flex-wrap: wrap; }
+  .app-layout .studio-shell .header-meta { font-size: 12px; overflow-wrap: anywhere; }
+  .app-layout .studio-shell .studio-body { grid-template-columns: minmax(0, 1fr); min-height: 0; }
+  .app-layout .studio-shell .lifecycle-panel { min-width: 0; padding: 12px 0 0; border-right: 0; border-bottom: 1px solid var(--ui-border); }
+  .app-layout .studio-shell .lifecycle-title-row { padding-bottom: 8px; }
+  .app-layout .studio-shell .step-list { display: flex; overflow-x: auto; padding: 0; }
+  .app-layout .studio-shell .step-row { flex: 0 0 190px; width: 190px; }
+  .app-layout .studio-shell .lifecycle-footnote { display: none; }
+  .app-layout .studio-shell .studio-main { padding: 16px; }
+  .app-layout .studio-shell .section-head,
+  .app-layout .studio-shell .publish-bar { flex-wrap: wrap; gap: 12px; }
+  .app-layout .studio-shell .binding-grid,
+  .app-layout .studio-shell .report-binding,
+  .app-layout .studio-shell .form-grid { grid-template-columns: minmax(0,1fr); }
+  .app-layout .studio-shell .form-grid .span-2 { grid-column: auto; }
+
+  /* Runtime selection keeps every scene value, stacked instead of clipped. */
+  .app-layout .composer-shell .scenario-select-page { padding: 16px 16px 92px; }
+  .app-layout .composer-shell .catalog-layout { grid-template-columns: minmax(0,1fr); }
+  .app-layout .composer-shell .scenario-header { display: none; }
+  .app-layout .composer-shell .scenario-row { grid-template-columns: 24px minmax(0,1fr); gap: 6px; }
+  .app-layout .composer-shell .scenario-row > :nth-child(n+3) { grid-column: 2; display: block; }
+  .app-layout .composer-shell .scene-identity { overflow-wrap: anywhere; }
+  .app-layout .composer-shell .bottom-actions,
+  .app-layout .composer-shell .wizard-actions { left: 0; padding: 12px 16px; }
+  .app-layout .composer-shell .context-header { position: static; flex-direction: column; align-items: stretch; gap: 12px; padding: 16px; }
+  .app-layout .composer-shell .context-left { min-width: 0; align-items: flex-start; }
+  .app-layout .composer-shell .context-left > div { min-width: 0; }
+  .app-layout .composer-shell .back-button { flex-shrink: 0; }
+  .app-layout .composer-shell .context-line { flex-wrap: wrap; }
+  .app-layout .composer-shell .context-sub { overflow-wrap: anywhere; }
+  .app-layout .composer-shell .wizard-layout { grid-template-columns: minmax(0,1fr); min-height: 0; }
+  .app-layout .composer-shell .wizard-steps { display: flex; overflow-x: auto; min-width: 0; padding: 8px 0; border-right: 0; }
+  .app-layout .composer-shell .wizard-step { flex: 0 0 180px; width: 180px; }
+  .app-layout .composer-shell .steps-title,
+  .app-layout .composer-shell .steps-note { display: none; }
+  .app-layout .composer-shell .wizard-main { padding: 16px 16px 96px; }
+  .app-layout .composer-shell .form-grid,
+  .app-layout .composer-shell .confirm-grid { grid-template-columns: minmax(0,1fr); }
+  .app-layout .composer-shell .span-2 { grid-column: auto; }
+  .app-layout .composer-shell .section-head { flex-wrap: wrap; gap: 12px; }
+  .app-layout .composer-shell .confirm-block { border-right: 0; border-bottom: 1px solid var(--ui-border-subtle); overflow-wrap: anywhere; }
+
+  /* Preserve the professional canvas coordinate system; stack its tools. */
+  .app-layout .workflow-shell .workflow-header { padding: 16px; }
+  .app-layout .workflow-shell .title-row { flex-wrap: wrap; }
+  .app-layout .workflow-shell .runtime-banner { align-items: flex-start; }
+  .app-layout .workflow-shell .workflow-body { grid-template-columns: minmax(0,1fr); height: auto; min-height: 0; }
+  .app-layout .workflow-shell .palette-panel { max-height: 220px; border-right: 0; border-bottom: 1px solid var(--ui-border); }
+  .app-layout .workflow-shell .canvas-panel { height: 540px; }
+  .app-layout .workflow-shell .canvas-toolbar { flex-wrap: wrap; gap: 8px; }
+  .app-layout .workflow-shell .toolbar-left,
+  .app-layout .workflow-shell .toolbar-right { flex-wrap: wrap; }
+  .app-layout .workflow-shell .canvas-scroll { padding: 12px; }
+  .app-layout .workflow-shell .inspector-panel { border-left: 0; overflow: visible; }
+
+  /* Field / metrology workbenches: no hidden zero-width execution surface. */
+  .app-layout .fsw-shell,
+  .app-layout .ws-page { height: auto; min-height: 100%; overflow: visible; }
+  .app-layout .fsw-header,
+  .app-layout .ws-header { flex-direction: column; align-items: stretch; gap: 12px; padding: 16px; }
+  .app-layout .fsh-meta,
+  .app-layout .ws-meta,
+  .app-layout .ws-header-left { flex-wrap: wrap; }
+  .app-layout .fsh-right,
+  .app-layout .ws-header-right { flex-wrap: wrap; }
+  .app-layout .fsw-body,
+  .app-layout .ws-body { display: block; overflow: visible; }
+  .app-layout .fsw-context,
+  .app-layout .ws-context { width: 100%; max-height: 220px; overflow-y: auto; border-right: 0; border-bottom: 1px solid var(--ui-border); }
+  .app-layout .fsw-main,
+  .app-layout .ws-main { padding: 16px; overflow: visible; }
+  .app-layout .fsw-main .el-form--inline .el-form-item { display: flex; margin-right: 0; width: 100%; }
+  .app-layout .fsw-main .el-form-item__content > .el-input,
+  .app-layout .fsw-main .el-form-item__content > .el-textarea,
+  .app-layout .fsw-main .el-form-item__content > .el-select,
+  .app-layout .fsw-main .el-form-item__content > .el-input-number { width: 100% !important; }
+  .app-layout .fsw-main .coc-table { overflow-x: auto; }
+  .app-layout .fsw-main .coc-header-row,
+  .app-layout .fsw-main .coc-data-row { min-width: 640px; }
+  .app-layout .ws-main .pfc-layout,
+  .app-layout .ws-main .detail-cards { flex-direction: column; }
+  .app-layout .ws-main .pfc-tree { width: 100%; }
+  .app-layout .ws-main .meas-summary,
+  .app-layout .ws-main .section-header { flex-wrap: wrap; gap: 8px; }
+  .app-layout .ws-main .ms-card { flex: 1 0 40%; min-width: 0; }
+  .app-layout .ws-main .pfc-table { min-width: 0; }
+
+  .el-drawer .drawer-shell .drawer-header { flex-wrap: wrap; gap: 12px; }
+  .el-drawer .drawer-shell .drawer-title-row { flex-wrap: wrap; }
+  .el-drawer .drawer-shell .drawer-tabs { overflow-x: auto; gap: 12px; }
+  .el-drawer .drawer-shell .drawer-tabs button { flex-shrink: 0; }
+  .el-drawer .drawer-shell .dependency-row { grid-template-columns: minmax(0,1fr); }
+  .el-drawer .drawer-shell .version-row { grid-template-columns: minmax(0,1fr); }
+  .el-drawer .drawer-shell .runtime-summary { grid-template-columns: 1fr 1fr; }
+  .el-drawer .drawer-shell .reference-token { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+}
