@@ -1,445 +1,317 @@
 <template>
   <div class="composer-shell">
-    <!-- Step 0: Scene selection -->
-    <div v-if="step === 0" class="scene-select-page">
-      <div class="ssp-header">
-        <div class="ssp-title">新建检测委托</div>
-        <div class="ssp-sub">第一步：选择已发布场景 · 场景版本决定后续表单和流程</div>
+    <section v-if="stage === 'select'" class="scenario-select-page">
+      <div class="page-header">
+        <div>
+          <h1>新建委托 / 申请</h1>
+          <p>先选择一个已发布且已激活的场景。场景版本决定后续表单、对象模型、检测项与运行流程。</p>
+        </div>
       </div>
-      <div class="scene-filter">
-        <el-input placeholder="搜索场景名称 / Key" style="width:240px" size="small" clearable prefix-icon="Search" />
-        <el-select placeholder="领域" clearable size="small" style="width:120px">
-          <el-option label="食品检测" value="food" />
-          <el-option label="环境检测" value="env" />
-          <el-option label="几何量" value="metrology" />
-        </el-select>
-        <el-select placeholder="实验室" clearable size="small" style="width:160px">
-          <el-option label="上海食品检测实验室" value="sh" />
-          <el-option label="深圳综合检测实验室" value="sz" />
-        </el-select>
+
+      <div class="catalog-layout">
+        <div class="catalog-main">
+          <div class="filter-bar">
+            <el-input v-model="search" placeholder="搜索场景名称 / Key" clearable size="small" style="width: 260px" prefix-icon="Search" />
+            <el-select v-model="domainFilter" placeholder="领域" clearable size="small" style="width: 150px">
+              <el-option label="食品检测" value="食品检测" />
+              <el-option label="环境检测" value="环境检测" />
+              <el-option label="几何量" value="几何量" />
+            </el-select>
+            <el-select v-model="modeFilter" placeholder="业务模式" clearable size="small" style="width: 160px">
+              <el-option label="第三方委托" value="第三方委托" />
+              <el-option label="企业内部" value="企业内部" />
+            </el-select>
+          </div>
+
+          <div class="scenario-table">
+            <div class="scenario-header scenario-grid">
+              <span></span><span>场景</span><span>版本</span><span>业务模式</span><span>领域</span><span>激活范围</span><span>状态</span>
+            </div>
+            <button
+              v-for="scene in filteredScenes"
+              :key="scene.id"
+              :class="['scenario-row', 'scenario-grid', { selected: selectedScene?.id === scene.id }]"
+              @click="selectedScene = scene"
+            >
+              <span class="radio-mark"><span v-if="selectedScene?.id === scene.id"></span></span>
+              <span class="scene-identity"><strong>{{ scene.name }}</strong><span>{{ scene.key }}</span></span>
+              <span class="version-token">{{ scene.version }}</span>
+              <span>{{ scene.mode }}</span>
+              <span>{{ scene.domain }}</span>
+              <span>{{ scene.activationScope }}</span>
+              <span class="state-ok"><el-icon><CircleCheck /></el-icon>可用</span>
+            </button>
+          </div>
+        </div>
+
+        <aside class="scenario-inspector">
+          <template v-if="selectedScene">
+            <div class="inspector-title">场景快照</div>
+            <h2>{{ selectedScene.name }}</h2>
+            <div class="inspector-key">{{ selectedScene.key }}</div>
+            <div class="snapshot-kv"><span>Published Version</span><strong>{{ selectedScene.version }}</strong></div>
+            <div class="snapshot-kv"><span>Snapshot Hash</span><strong class="mono">sha256:{{ selectedScene.hash }}</strong></div>
+            <div class="snapshot-kv"><span>检测项</span><strong>{{ selectedScene.testItems.length }} 项</strong></div>
+            <div class="snapshot-kv"><span>流程版本</span><strong>{{ selectedScene.workflowVersion }}</strong></div>
+            <div class="snapshot-kv"><span>运行步骤</span><strong>{{ selectedScene.runtimeSteps.length }} 步</strong></div>
+            <div class="inspector-divider"></div>
+            <div class="inspector-label">运行流程</div>
+            <div class="runtime-sequence">
+              <template v-for="(node, index) in selectedScene.runtimeSteps" :key="node">
+                <span>{{ node }}</span><el-icon v-if="index < selectedScene.runtimeSteps.length - 1"><ArrowRight /></el-icon>
+              </template>
+            </div>
+            <div class="snapshot-note"><el-icon><Lock /></el-icon>提交后将把该 Scenario Snapshot 绑定到业务记录，后续新版本不会影响本次委托。</div>
+          </template>
+          <div v-else class="inspector-empty">请选择一个场景查看快照信息。</div>
+        </aside>
       </div>
-      <div class="scene-cards">
-        <div
-          v-for="sc in publishedScenes"
-          :key="sc.id"
-          :class="['scene-card', { selected: selectedScene?.id === sc.id }]"
-          @click="selectedScene = sc"
-        >
-          <div class="scard-head">
-            <div class="scard-check"><div :class="['sc-radio', { on: selectedScene?.id === sc.id }]"></div></div>
-            <div class="scard-name">{{ sc.name }}</div>
-            <span class="scard-ver">{{ sc.version }}</span>
+
+      <div class="bottom-actions">
+        <el-button @click="router.back()">取消</el-button>
+        <el-button type="primary" :disabled="!selectedScene" @click="startRequest">使用此场景</el-button>
+      </div>
+    </section>
+
+    <section v-else class="request-workspace">
+      <header class="context-header">
+        <div class="context-left">
+          <button class="back-button" @click="stage = 'select'"><el-icon><ArrowLeft /></el-icon></button>
+          <div>
+            <div class="context-line"><span class="context-label">场景</span><strong>{{ selectedScene?.name }}</strong><span class="version-token">{{ selectedScene?.version }}</span><span class="readonly-state"><el-icon><Lock /></el-icon>Snapshot locked</span></div>
+            <div class="context-sub">{{ selectedScene?.key }} · sha256:{{ selectedScene?.hash }} · Workflow {{ selectedScene?.workflowVersion }}</div>
           </div>
-          <div class="scard-key">{{ sc.key }}</div>
-          <div class="scard-tags">
-            <span class="scard-tag mode">{{ sc.mode }}</span>
-            <span class="scard-tag domain">{{ sc.domain }}</span>
-            <span class="scard-tag lab">{{ sc.lab }}</span>
-          </div>
-          <div class="scard-meta">
-            <span>{{ sc.itemCount }} 检测项</span>
-            <span>{{ sc.nodeCount }} 流程节点</span>
-          </div>
-          <div class="scard-steps">
-            <div class="scard-steps-label">向导步骤</div>
-            <div class="scard-step-list">
-              <span v-for="(s, i) in sc.steps" :key="i" class="scard-step-item">{{ i+1 }}. {{ s }}</span>
+        </div>
+        <div class="context-actions"><el-button size="small">保存草稿</el-button><el-button type="primary" size="small" :disabled="currentStep !== wizardSteps.length" @click="submitRequest">提交</el-button></div>
+      </header>
+
+      <div class="wizard-layout">
+        <aside class="wizard-steps">
+          <div class="steps-title">委托配置</div>
+          <button v-for="(step, index) in wizardSteps" :key="step.key" :class="['wizard-step', { active: currentStep === index + 1, done: currentStep > index + 1 }]" @click="currentStep > index + 1 && (currentStep = index + 1)">
+            <span class="step-index"><el-icon v-if="currentStep > index + 1"><Check /></el-icon><span v-else>{{ index + 1 }}</span></span>
+            <span><strong>{{ step.name }}</strong><small>{{ step.source }}</small></span>
+          </button>
+          <div class="steps-note">向导来自当前场景的 runtime.request.setup 配置，通用前端不硬编码 Food / Environment / Metrology 字段。</div>
+        </aside>
+
+        <main class="wizard-main">
+          <div v-if="currentStep === 1" class="wizard-section">
+            <div class="section-head"><div><h2>委托基本信息</h2><p>由 <span class="mono-inline">{{ selectedScene?.requestSchema }}</span> 渲染。</p></div></div>
+            <div class="schema-form">
+              <el-form label-position="top" size="small">
+                <div class="form-grid">
+                  <el-form-item v-for="field in selectedScene?.requestFields" :key="field.key" :label="field.label" :required="field.required" :class="{ 'span-2': field.span === 2 }">
+                    <el-input v-if="field.type === 'text'" v-model="requestData[field.key]" :placeholder="field.placeholder || ''" />
+                    <el-input v-else-if="field.type === 'textarea'" v-model="requestData[field.key]" type="textarea" :rows="3" :placeholder="field.placeholder || ''" />
+                    <el-select v-else-if="field.type === 'select'" v-model="requestData[field.key]" style="width:100%" placeholder="请选择"><el-option v-for="option in field.options" :key="option" :label="option" :value="option" /></el-select>
+                    <el-date-picker v-else-if="field.type === 'date'" v-model="requestData[field.key]" type="date" style="width:100%" placeholder="选择日期" />
+                  </el-form-item>
+                </div>
+              </el-form>
             </div>
           </div>
-          <div class="scard-hash">
-            <el-icon size="10" color="#18794E"><Lock /></el-icon>
-            sha256:{{ sc.hash }}
-          </div>
-        </div>
-      </div>
-      <div class="scene-select-actions">
-        <el-button @click="$router.back()">取消</el-button>
-        <el-button type="primary" :disabled="!selectedScene" @click="confirmScene">
-          使用此场景，进入委托向导 <el-icon><ArrowRight /></el-icon>
-        </el-button>
-      </div>
-    </div>
 
-    <!-- Steps 1+: Wizard driven by selected scene -->
-    <template v-else>
-      <!-- Fixed top context bar -->
-      <div class="wizard-topbar">
-        <div class="wtb-left">
-          <div class="wtb-back" @click="step = 0">
-            <el-icon size="13"><ArrowLeft /></el-icon>
-          </div>
-          <div class="wtb-scene-info">
-            <span class="wtb-label">场景：</span>
-            <span class="wtb-scene-name">{{ selectedScene?.name }}</span>
-            <span class="wtb-ver">{{ selectedScene?.version }}</span>
-            <span class="wtb-snap">
-              <el-icon size="10" color="#18794E"><Lock /></el-icon>
-              sha256:{{ selectedScene?.hash }}
-            </span>
-          </div>
-        </div>
-        <div class="wtb-actions">
-          <el-button size="small">保存草稿</el-button>
-          <el-button type="primary" size="small" :disabled="!canSubmit">提交委托</el-button>
-        </div>
-      </div>
-
-      <!-- Steps progress -->
-      <div class="wizard-stepper-row">
-        <div
-          v-for="(s, i) in currentSteps"
-          :key="i"
-          :class="['wiz-step', { active: step === i + 1, done: step > i + 1 }]"
-          @click="step > i + 1 ? step = i+1 : null"
-        >
-          <div class="ws-circle">
-            <el-icon v-if="step > i+1" size="11"><Check /></el-icon>
-            <span v-else>{{ i+1 }}</span>
-          </div>
-          <span class="ws-label">{{ s }}</span>
-          <div class="ws-connector" v-if="i < currentSteps.length - 1"></div>
-        </div>
-      </div>
-
-      <!-- Wizard content -->
-      <div class="wizard-body">
-        <!-- Step 1: Basic info -->
-        <template v-if="step === 1">
-          <div class="wiz-step-header">
-            <div class="wiz-step-title">委托基本信息</div>
-            <div class="wiz-step-sub">由场景 <strong>{{ selectedScene?.name }}</strong> 的委托受理表单驱动</div>
-          </div>
-          <div class="wiz-form-wrap">
-            <el-form label-position="top" size="small">
-              <el-form-item label="委托方名称" required>
-                <el-input placeholder="请输入委托方全称" />
-              </el-form-item>
-              <el-form-item label="委托方联系人">
-                <el-input placeholder="姓名" />
-              </el-form-item>
-              <el-form-item label="委托方联系电话">
-                <el-input placeholder="手机号" />
-              </el-form-item>
-              <el-form-item label="委托方地址">
-                <el-input placeholder="地址" />
-              </el-form-item>
-              <el-form-item label="检测目的" required>
-                <el-select placeholder="请选择" style="width:100%">
-                  <el-option label="合规检测（监督备案）" value="compliance" />
-                  <el-option label="出口认证" value="export" />
-                  <el-option label="内部质控" value="internal" />
-                  <el-option label="纠纷仲裁" value="dispute" />
-                </el-select>
-              </el-form-item>
-              <el-form-item label="紧急程度">
-                <el-radio-group value="normal">
-                  <el-radio value="normal">正常</el-radio>
-                  <el-radio value="urgent">加急</el-radio>
-                  <el-radio value="very-urgent">特急</el-radio>
-                </el-radio-group>
-              </el-form-item>
-              <el-form-item label="期望完成日期">
-                <el-date-picker type="date" placeholder="选择日期" style="width:200px" />
-              </el-form-item>
-            </el-form>
-          </div>
-        </template>
-
-        <!-- Step 2: Sample table (adapted per scene) -->
-        <template v-else-if="step === 2">
-          <div class="wiz-step-header">
-            <div class="wiz-step-title">
-              {{ selectedScene?.domain === '食品检测' ? '食品样品清单 · FOOD_SAMPLE' : selectedScene?.domain === '环境检测' ? '采样点位清单 · SAMPLING_POINT' : '检测对象清单' }}
-            </div>
-            <div class="wiz-step-sub">对象类型由场景配置驱动，字段来自场景绑定的动态表单</div>
-            <el-button size="small" type="primary" style="margin-left:auto" @click="addSample">+ 添加样品</el-button>
-          </div>
-          <div class="sample-table-wrap">
-            <el-table :data="samples" border size="small">
-              <el-table-column label="#" width="40" type="index" />
-              <el-table-column v-if="selectedScene?.domain === '食品检测'" label="样品名称" min-width="130">
+          <div v-else-if="currentStep === 2" class="wizard-section">
+            <div class="section-head"><div><h2>{{ selectedScene?.subjectLabel }}</h2><p>对象结构来自 <span class="mono-inline">{{ selectedScene?.subjectSchema }}</span>。</p></div><el-button type="primary" size="small" @click="addSubject">添加对象</el-button></div>
+            <el-table :data="subjects" border size="small">
+              <el-table-column type="index" label="#" width="45" />
+              <el-table-column v-for="field in selectedScene?.subjectFields" :key="field.key" :label="field.label" :min-width="field.width || 130">
                 <template #default="{ row }">
-                  <el-input v-model="row.name" size="small" placeholder="样品名称" />
+                  <el-input v-if="field.type === 'text'" v-model="row[field.key]" size="small" :placeholder="field.placeholder || ''" />
+                  <el-select v-else v-model="row[field.key]" size="small" style="width:100%" placeholder="请选择"><el-option v-for="option in field.options" :key="option" :label="option" :value="option" /></el-select>
                 </template>
               </el-table-column>
-              <el-table-column v-if="selectedScene?.domain === '食品检测'" label="食品类别" width="140">
-                <template #default="{ row }">
-                  <el-select v-model="row.category" size="small" style="width:100%">
-                    <el-option label="粮食及制品" value="grain" />
-                    <el-option label="肉及肉制品" value="meat" />
-                    <el-option label="水产品" value="seafood" />
-                    <el-option label="蔬菜" value="veg" />
-                    <el-option label="饮料" value="drink" />
-                  </el-select>
-                </template>
-              </el-table-column>
-              <el-table-column v-if="selectedScene?.domain === '环境检测'" label="点位编号" width="120">
-                <template #default="{ row }">
-                  <el-input v-model="row.pointId" size="small" />
-                </template>
-              </el-table-column>
-              <el-table-column v-if="selectedScene?.domain === '环境检测'" label="点位类型" width="130">
-                <template #default="{ row }">
-                  <el-select v-model="row.pointType" size="small" style="width:100%">
-                    <el-option label="地表水" value="surface" />
-                    <el-option label="地下水" value="ground" />
-                    <el-option label="废水排放口" value="discharge" />
-                  </el-select>
-                </template>
-              </el-table-column>
-              <el-table-column label="数量" width="80">
-                <template #default="{ row }">
-                  <el-input-number v-model="row.qty" :min="1" size="small" style="width:70px" />
-                </template>
-              </el-table-column>
-              <el-table-column label="备注" min-width="120">
-                <template #default="{ row }">
-                  <el-input v-model="row.note" size="small" placeholder="可选" />
-                </template>
-              </el-table-column>
-              <el-table-column label="操作" width="60">
-                <template #default="{ $index }">
-                  <el-button link size="small" type="danger" @click="samples.splice($index, 1)">删除</el-button>
-                </template>
-              </el-table-column>
+              <el-table-column label="操作" width="70"><template #default="{ $index }"><el-button link type="danger" size="small" @click="subjects.splice($index,1)">删除</el-button></template></el-table-column>
             </el-table>
           </div>
-        </template>
 
-        <!-- Step 3: Test items selection -->
-        <template v-else-if="step === 3">
-          <div class="wiz-step-header">
-            <div class="wiz-step-title">检测项选择</div>
-            <div class="wiz-step-sub">以下检测项来自场景 <strong>{{ selectedScene?.name }}</strong> 配置，含标准和限值均已锁定</div>
-          </div>
-          <div class="test-item-select-table">
-            <el-table :data="sceneTestItems" border size="small">
+          <div v-else-if="currentStep === 3" class="wizard-section">
+            <div class="section-head"><div><h2>检测项</h2><p>只展示当前 Scenario Snapshot 已发布的能力，标准、方法与限值版本不可在委托时随意替换。</p></div></div>
+            <el-table :data="selectedScene?.testItems || []" border size="small" @selection-change="selectedItems = $event">
               <el-table-column type="selection" width="44" />
-              <el-table-column label="检测项" min-width="130">
-                <template #default="{ row }">
-                  <div class="ti-name">{{ row.name }}</div>
-                  <div class="ti-en">{{ row.en }}</div>
-                </template>
-              </el-table-column>
-              <el-table-column label="适用标准（快照锁定）" min-width="170">
-                <template #default="{ row }">
-                  <span class="ref-chip std">{{ row.standard }}</span>
-                </template>
-              </el-table-column>
-              <el-table-column label="检测方法" min-width="150">
-                <template #default="{ row }">
-                  <span class="ref-chip method">{{ row.method }}</span>
-                </template>
-              </el-table-column>
-              <el-table-column label="限值规则" width="150">
-                <template #default="{ row }">
-                  <span class="ref-chip limit">{{ row.limit }}</span>
-                </template>
-              </el-table-column>
+              <el-table-column prop="name" label="检测项" min-width="130"><template #default="{ row }"><strong>{{ row.name }}</strong><div class="mono-sub">{{ row.code }}</div></template></el-table-column>
+              <el-table-column label="标准版本" min-width="170"><template #default="{ row }"><span class="reference-token">{{ row.standard }}</span></template></el-table-column>
+              <el-table-column label="方法版本" min-width="160"><template #default="{ row }"><span class="reference-token">{{ row.method }}</span></template></el-table-column>
+              <el-table-column label="限值规则" min-width="150"><template #default="{ row }"><span class="reference-token">{{ row.limit }}</span></template></el-table-column>
             </el-table>
+            <div class="table-help">默认按场景预选常用检测项；用户只能在已发布能力范围内选择。</div>
           </div>
-        </template>
 
-        <!-- Step 4: Attachments -->
-        <template v-else-if="step === 4">
-          <div class="wiz-step-header">
-            <div class="wiz-step-title">随附资料上传</div>
-            <div class="wiz-step-sub">委托合同、样品来源证明、特殊要求说明等（可选）</div>
+          <div v-else class="wizard-section">
+            <div class="section-head"><div><h2>确认并启动流程</h2><p>提交后创建 TestRequest，并基于锁定的 Scenario Snapshot 创建 Process Instance。</p></div></div>
+            <div class="confirm-grid">
+              <div class="confirm-block"><span>场景</span><strong>{{ selectedScene?.name }} {{ selectedScene?.version }}</strong><small>{{ selectedScene?.key }}</small></div>
+              <div class="confirm-block"><span>Snapshot</span><strong class="mono">sha256:{{ selectedScene?.hash }}</strong><small>不可变</small></div>
+              <div class="confirm-block"><span>检测对象</span><strong>{{ subjects.length }} 个</strong><small>{{ selectedScene?.subjectLabel }}</small></div>
+              <div class="confirm-block"><span>检测项</span><strong>{{ selectedItems.length || selectedScene?.testItems.length }} 项</strong><small>版本已锁定</small></div>
+            </div>
+            <div class="process-preview">
+              <div class="preview-title">将启动的运行流程</div>
+              <div class="process-nodes"><template v-for="(node,index) in selectedScene?.runtimeSteps" :key="node"><div class="process-node"><span>{{ index + 1 }}</span><strong>{{ node }}</strong></div><el-icon v-if="index < (selectedScene?.runtimeSteps.length || 0)-1"><ArrowRight /></el-icon></template></div>
+            </div>
+            <div class="submit-note"><el-icon><InfoFilled /></el-icon>运行时每个节点将通过 Node Type Registry 解析 Executor 与 Runtime Renderer；人工任务进入“我的工作”。</div>
           </div>
-          <div class="wiz-form-wrap">
-            <el-upload drag multiple>
-              <el-icon size="28" color="#B0B9C6"><UploadFilled /></el-icon>
-              <div class="upload-text">拖拽文件至此，或<em>点击选择文件</em></div>
-              <div class="upload-hint">支持 PDF、Word、Excel、图片；单文件 ≤ 50MB</div>
-            </el-upload>
-          </div>
-        </template>
 
-        <!-- Step 5: Confirm & Submit -->
-        <template v-else-if="step === 5">
-          <div class="wiz-step-header">
-            <div class="wiz-step-title">确认委托信息</div>
-            <div class="wiz-step-sub">提交后将创建委托，并按场景快照启动流程。</div>
+          <div class="wizard-actions">
+            <el-button @click="currentStep === 1 ? stage = 'select' : currentStep--">上一步</el-button>
+            <el-button v-if="currentStep < wizardSteps.length" type="primary" @click="currentStep++">下一步</el-button>
+            <el-button v-else type="primary" @click="submitRequest">提交并启动流程</el-button>
           </div>
-          <div class="confirm-section">
-            <div class="confirm-snapshot">
-              <el-icon size="12" color="#18794E"><Lock /></el-icon>
-              快照将被锁定：<strong>{{ selectedScene?.name }} {{ selectedScene?.version }}</strong>
-              · sha256:{{ selectedScene?.hash }}
-            </div>
-            <div class="confirm-block">
-              <div class="cb-title">场景</div>
-              <div class="cb-val">{{ selectedScene?.name }} · {{ selectedScene?.version }}</div>
-            </div>
-            <div class="confirm-block">
-              <div class="cb-title">委托方</div>
-              <div class="cb-val">—（已在步骤 1 填写）</div>
-            </div>
-            <div class="confirm-block">
-              <div class="cb-title">样品数量</div>
-              <div class="cb-val">{{ samples.length }} 件</div>
-            </div>
-            <div class="confirm-block">
-              <div class="cb-title">检测项</div>
-              <div class="cb-val">{{ sceneTestItems.length }} 项（按场景配置全选）</div>
-            </div>
-            <div class="submit-cta">
-              <el-button @click="step--">上一步</el-button>
-              <el-button type="primary" @click="canSubmit = true">提交委托</el-button>
-            </div>
-          </div>
-        </template>
-
-        <!-- Step navigation -->
-        <div class="wiz-nav" v-if="step < currentSteps.length">
-          <el-button @click="step > 1 ? step-- : step = 0">
-            <el-icon><ArrowLeft /></el-icon> 上一步
-          </el-button>
-          <el-button type="primary" @click="step++">
-            下一步 <el-icon><ArrowRight /></el-icon>
-          </el-button>
-        </div>
+        </main>
       </div>
-    </template>
+    </section>
   </div>
 </template>
-<script setup lang="ts">
-import { ref, computed } from 'vue'
 
-const step = ref(0)
+<script setup lang="ts">
+import { computed, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
+const stage = ref<'select' | 'wizard'>('select')
+const currentStep = ref(1)
+const search = ref('')
+const domainFilter = ref('')
+const modeFilter = ref('')
 const selectedScene = ref<any>(null)
-const canSubmit = ref(false)
+const requestData = reactive<Record<string, any>>({})
+const subjects = ref<any[]>([])
+const selectedItems = ref<any[]>([])
 
 const publishedScenes = ref([
   {
-    id: 1, name: '第三方食品理化检测', key: 'third-party-food-physchem',
-    version: 'v1.2.0', hash: '7fa3c2d', mode: '第三方委托', domain: '食品检测',
-    lab: '上海食品检测实验室', itemCount: 18, nodeCount: 7,
-    steps: ['委托信息', '食品样品', '检测项', '随附资料', '确认提交'],
+    id: 1, name: '第三方食品理化检测', key: 'third-party-food-physchem', version: 'v1.2.0', hash: '7fa3c2d9', mode: '第三方委托', domain: '食品检测', activationScope: '华东食品实验室', workflowVersion: 'food-flow v1.4',
+    requestSchema: 'third-party-request-intake · v3', subjectSchema: 'food-sample-intake · v3', subjectLabel: '食品样品',
+    requestFields: [
+      { key: 'customer', label: '委托方名称', type: 'text', required: true, placeholder: '请输入委托方全称' },
+      { key: 'contact', label: '联系人', type: 'text', required: true },
+      { key: 'purpose', label: '检测目的', type: 'select', required: true, options: ['合规检测', '出口认证', '研发验证', '纠纷仲裁'] },
+      { key: 'dueDate', label: '期望完成日期', type: 'date', required: true },
+      { key: 'requirements', label: '特殊要求', type: 'textarea', span: 2, placeholder: '可选：报告语言、交付方式、特殊检测要求等' },
+    ],
+    subjectFields: [
+      { key: 'name', label: '样品名称', type: 'text', width: 160 },
+      { key: 'category', label: '食品类别', type: 'select', options: ['粮食及制品', '肉及肉制品', '水产品', '蔬菜', '饮料'], width: 150 },
+      { key: 'batch', label: '批次 / Lot', type: 'text', width: 130 },
+      { key: 'quantity', label: '数量', type: 'text', width: 90 },
+    ],
+    testItems: [
+      { code: 'FOOD.PB', name: '铅 Pb', standard: 'GB 5009.12-2023', method: 'ICP-MS Pb v2.1', limit: 'Food Pb Limit v3' },
+      { code: 'FOOD.CD', name: '镉 Cd', standard: 'GB 5009.15-2023', method: 'ICP-MS Cd v2.0', limit: 'Food Cd Limit v2' },
+      { code: 'FOOD.MOISTURE', name: '水分', standard: 'GB 5009.3-2016', method: 'Drying v3', limit: 'Product Spec v5' },
+    ],
+    runtimeSteps: ['委托受理', '收样', '样品前处理', '实验室检测', '技术审核', '报告签发'],
   },
   {
-    id: 2, name: '食品微生物检测', key: 'food-microbiology',
-    version: 'v2.1.0', hash: 'a8b91ef', mode: '第三方委托', domain: '食品检测',
-    lab: '上海食品检测实验室', itemCount: 12, nodeCount: 6,
-    steps: ['委托信息', '食品样品', '检测项', '确认提交'],
+    id: 2, name: '环境水质现场监测', key: 'environment-water-field', version: 'v2.0.1', hash: 'c3d45fe8', mode: '第三方委托', domain: '环境检测', activationScope: '深圳综合实验室', workflowVersion: 'env-field-flow v2.3',
+    requestSchema: 'environment-project-request · v2', subjectSchema: 'sampling-point · v4', subjectLabel: '采样点位',
+    requestFields: [
+      { key: 'customer', label: '委托单位', type: 'text', required: true },
+      { key: 'project', label: '监测项目', type: 'text', required: true },
+      { key: 'monitoringType', label: '监测类型', type: 'select', required: true, options: ['地表水', '地下水', '工业废水', '生活污水'] },
+      { key: 'dueDate', label: '计划完成日期', type: 'date', required: true },
+      { key: 'requirements', label: '现场要求', type: 'textarea', span: 2 },
+    ],
+    subjectFields: [
+      { key: 'pointCode', label: '点位编号', type: 'text', width: 120 },
+      { key: 'pointName', label: '点位名称', type: 'text', width: 160 },
+      { key: 'pointType', label: '点位类型', type: 'select', options: ['地表水', '地下水', '排放口'], width: 130 },
+      { key: 'location', label: '位置描述', type: 'text', width: 180 },
+    ],
+    testItems: [
+      { code: 'ENV.COD', name: 'COD', standard: 'HJ 828-2017', method: 'Dichromate v2', limit: 'Discharge COD v4' },
+      { code: 'ENV.NH3N', name: '氨氮', standard: 'HJ 535-2009', method: 'Nessler v2', limit: 'Discharge NH3N v3' },
+    ],
+    runtimeSteps: ['监测方案', '现场采样', '样品运输', '实验室接收', '实验室检测', '技术审核', '报告签发'],
   },
   {
-    id: 3, name: '环境水质监测', key: 'env-water-quality',
-    version: 'v1.0.0', hash: 'c3d45fe', mode: '政府委托', domain: '环境检测',
-    lab: '深圳综合检测实验室', itemCount: 24, nodeCount: 9,
-    steps: ['委托信息', '采样点位', '检测项', '现场采样计划', '确认提交'],
-  },
-  {
-    id: 4, name: '工业零件几何量', key: 'industrial-part-metrology',
-    version: 'v3.0.1', hash: 'e9f01ac', mode: '企业内部', domain: '几何量',
-    lab: '北京计量实验室', itemCount: 8, nodeCount: 5,
-    steps: ['委托信息', '零件清单', '检测项', '确认提交'],
+    id: 3, name: '企业内部几何量检测', key: 'internal-metrology', version: 'v2.1.0', hash: 'e9f01ac4', mode: '企业内部', domain: '几何量', activationScope: '北京计量实验室', workflowVersion: 'metrology-flow v2.1',
+    requestSchema: 'internal-metrology-request · v2', subjectSchema: 'metrology-part · v3', subjectLabel: '零件 / Part',
+    requestFields: [
+      { key: 'department', label: '申请部门', type: 'text', required: true },
+      { key: 'source', label: '来源业务', type: 'select', required: true, options: ['来料检验', '过程检验', '成品检验', '研发试验'] },
+      { key: 'workOrder', label: '工单 / 项目号', type: 'text' },
+      { key: 'dueDate', label: '要求完成日期', type: 'date', required: true },
+      { key: 'requirements', label: '测量要求', type: 'textarea', span: 2 },
+    ],
+    subjectFields: [
+      { key: 'partNo', label: '零件号', type: 'text', width: 130 },
+      { key: 'partName', label: '零件名称', type: 'text', width: 160 },
+      { key: 'serial', label: '序列号', type: 'text', width: 130 },
+      { key: 'drawing', label: '图纸版本', type: 'text', width: 110 },
+    ],
+    testItems: [
+      { code: 'MET.DIAMETER', name: '孔径', standard: 'Drawing Rev.C', method: 'CMM Dimension v4', limit: 'Tolerance Profile v7' },
+      { code: 'MET.FLATNESS', name: '平面度', standard: 'ISO 1101:2017', method: 'CMM GD&T v3', limit: 'Drawing Tolerance v5' },
+    ],
+    runtimeSteps: ['内部申请', '任务策划', 'CMM 测量', '结果判定', '技术审核', '结果回写'],
   },
 ])
 
-const currentSteps = computed(() => selectedScene.value?.steps || [])
+const filteredScenes = computed(() => publishedScenes.value.filter(scene => {
+  const text = `${scene.name} ${scene.key}`.toLowerCase()
+  return (!search.value || text.includes(search.value.toLowerCase())) && (!domainFilter.value || scene.domain === domainFilter.value) && (!modeFilter.value || scene.mode === modeFilter.value)
+}))
 
-const samples = ref([
-  { name: '大米样品A', category: 'grain', qty: 1, note: '' },
-  { name: '鱼肉样品B', category: 'seafood', qty: 2, note: '冷冻保存' },
+const wizardSteps = computed(() => [
+  { key: 'request', name: '基本信息', source: selectedScene.value?.requestSchema || '' },
+  { key: 'subject', name: selectedScene.value?.subjectLabel || '检测对象', source: selectedScene.value?.subjectSchema || '' },
+  { key: 'items', name: '检测项', source: 'Scenario Snapshot' },
+  { key: 'confirm', name: '确认与启动', source: 'Process Runtime' },
 ])
 
-function addSample() {
-  samples.value.push({ name: '', category: '', qty: 1, note: '' })
+function startRequest() {
+  if (!selectedScene.value) return
+  stage.value = 'wizard'
+  currentStep.value = 1
+  subjects.value = [{}]
+  selectedItems.value = [...selectedScene.value.testItems]
 }
-
-const sceneTestItems = ref([
-  { name: '铅', en: 'Lead Pb', standard: 'GB 5009.12-2023', method: 'ICP-MS Pb v2', limit: 'Food Pb Limit v3' },
-  { name: '镉', en: 'Cadmium Cd', standard: 'GB 5009.15-2023', method: 'ICP-MS Cd v2', limit: 'Food Cd Limit v2' },
-  { name: '总砷', en: 'Arsenic As', standard: 'GB 5009.11-2014', method: 'HG-AFS As v1', limit: 'Food As Limit v2' },
-  { name: '汞', en: 'Mercury Hg', standard: 'GB 5009.17-2021', method: 'AFS Hg v2', limit: 'Food Hg Limit v1' },
-  { name: '菌落总数', en: 'TPC', standard: 'GB 4789.2-2022', method: 'Plate Count v3', limit: 'TPC Limit v2' },
-  { name: '苯甲酸', en: 'Benzoic Acid', standard: 'GB 5009.28-2016', method: 'HPLC BA v3', limit: 'Additive Limit v2' },
-])
-
-function confirmScene() {
-  step.value = 1
-}
+function addSubject() { subjects.value.push({}) }
+function submitRequest() { router.push('/app/operations/my-work') }
 </script>
+
 <style scoped>
-.composer-shell { display: flex; flex-direction: column; height: 100%; overflow: hidden; background: #F5F7FA; }
-
-/* Scene select page */
-.scene-select-page { flex: 1; overflow-y: auto; padding: 24px 32px; }
-.ssp-header { margin-bottom: 20px; }
-.ssp-title { font-size: 20px; font-weight: 600; color: #0B1220; }
-.ssp-sub { font-size: 13px; color: #526075; margin-top: 4px; }
-.scene-filter { display: flex; gap: 8px; margin-bottom: 16px; }
-.scene-cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 24px; }
-.scene-card { background: #fff; border: 2px solid #D9DEE7; border-radius: 6px; padding: 14px; cursor: pointer; }
-.scene-card:hover { border-color: #91CAFF; }
-.scene-card.selected { border-color: #1677FF; }
-.scard-head { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
-.sc-radio { width: 16px; height: 16px; border-radius: 50%; border: 2px solid #D9DEE7; flex-shrink: 0; }
-.sc-radio.on { border-color: #1677FF; background: #1677FF; box-shadow: inset 0 0 0 3px #fff; }
-.scard-name { font-size: 14px; font-weight: 600; color: #0B1220; flex: 1; }
-.scard-ver { font-size: 10px; padding: 2px 6px; border-radius: 3px; background: #F0FFF4; color: #18794E; border: 1px solid #B7E6CB; font-weight: 600; }
-.scard-key { font-size: 11px; font-family: monospace; color: #8A96A6; margin-bottom: 8px; margin-left: 26px; }
-.scard-tags { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 8px; margin-left: 26px; }
-.scard-tag { font-size: 10px; padding: 1px 6px; border-radius: 2px; }
-.scard-tag.mode { background: #EDF4FF; color: #1677FF; }
-.scard-tag.domain { background: #F0FFF4; color: #18794E; }
-.scard-tag.lab { background: #F5F7FA; color: #526075; }
-.scard-meta { display: flex; gap: 12px; font-size: 12px; color: #8A96A6; margin-bottom: 10px; margin-left: 26px; }
-.scard-steps { margin-left: 26px; margin-bottom: 8px; }
-.scard-steps-label { font-size: 10px; color: #B0B9C6; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
-.scard-step-list { display: flex; flex-wrap: wrap; gap: 4px; }
-.scard-step-item { font-size: 11px; color: #526075; background: #F5F7FA; padding: 2px 6px; border-radius: 2px; }
-.scard-hash { font-size: 10px; font-family: monospace; color: #8A96A6; display: flex; align-items: center; gap: 4px; margin-left: 26px; }
-.scene-select-actions { display: flex; justify-content: flex-end; gap: 8px; }
-
-/* Wizard */
-.wizard-topbar { background: #fff; border-bottom: 1px solid #D9DEE7; padding: 0 24px; height: 52px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
-.wtb-left { display: flex; align-items: center; gap: 12px; }
-.wtb-back { cursor: pointer; padding: 4px; color: #526075; display: flex; align-items: center; }
-.wtb-back:hover { color: #1677FF; }
-.wtb-scene-info { display: flex; align-items: center; gap: 8px; font-size: 13px; }
-.wtb-label { color: #8A96A6; font-size: 12px; }
-.wtb-scene-name { font-weight: 600; color: #0B1220; }
-.wtb-ver { font-size: 11px; padding: 1px 5px; background: #F0FFF4; color: #18794E; border-radius: 3px; font-weight: 600; }
-.wtb-snap { font-size: 11px; font-family: monospace; color: #8A96A6; display: flex; align-items: center; gap: 3px; }
-.wtb-actions { display: flex; gap: 8px; }
-
-.wizard-stepper-row { background: #fff; border-bottom: 1px solid #D9DEE7; padding: 12px 32px; display: flex; align-items: center; flex-shrink: 0; }
-.wiz-step { display: flex; align-items: center; gap: 8px; }
-.ws-circle { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid #D9DEE7; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #8A96A6; background: #fff; flex-shrink: 0; }
-.wiz-step.active .ws-circle { border-color: #1677FF; color: #1677FF; }
-.wiz-step.done .ws-circle { background: #18794E; border-color: #18794E; color: #fff; }
-.ws-label { font-size: 12px; color: #526075; white-space: nowrap; }
-.wiz-step.active .ws-label { color: #1677FF; font-weight: 500; }
-.ws-connector { width: 32px; height: 1px; background: #D9DEE7; margin: 0 6px; }
-.wiz-step.done .ws-connector { background: #18794E; }
-
-.wizard-body { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
-.wiz-step-header { padding: 16px 32px 14px; background: #fff; border-bottom: 1px solid #D9DEE7; display: flex; align-items: flex-start; flex-wrap: wrap; gap: 4px; flex-shrink: 0; }
-.wiz-step-title { font-size: 16px; font-weight: 600; color: #0B1220; }
-.wiz-step-sub { font-size: 12px; color: #8A96A6; margin-top: 4px; width: 100%; }
-.wiz-form-wrap { padding: 20px 32px; max-width: 560px; }
-.sample-table-wrap { padding: 16px 32px; }
-.test-item-select-table { padding: 16px 32px; }
-
-.ref-chip { font-size: 10px; padding: 2px 6px; border-radius: 2px; font-family: monospace; }
-.ref-chip.std { background: #EDF4FF; color: #1677FF; }
-.ref-chip.method { background: #F0FFF4; color: #18794E; }
-.ref-chip.limit { background: #FFF3E0; color: #A9650A; }
-.ti-name { font-size: 13px; font-weight: 500; color: #0B1220; }
-.ti-en { font-size: 11px; color: #8A96A6; font-family: monospace; }
-
-.upload-text { font-size: 13px; color: #526075; margin-top: 8px; }
-.upload-text em { color: #1677FF; font-style: normal; }
-.upload-hint { font-size: 11px; color: #B0B9C6; margin-top: 4px; }
-
-.confirm-section { padding: 20px 32px; max-width: 600px; }
-.confirm-snapshot { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #18794E; background: #F0FFF4; border: 1px solid #B7E6CB; border-radius: 4px; padding: 10px 14px; margin-bottom: 20px; font-family: monospace; }
-.confirm-block { margin-bottom: 14px; }
-.cb-title { font-size: 11px; color: #B0B9C6; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
-.cb-val { font-size: 13px; color: #0B1220; }
-.submit-cta { display: flex; gap: 8px; margin-top: 24px; }
-
-.wiz-nav { display: flex; justify-content: space-between; padding: 14px 32px; border-top: 1px solid #E7EAF0; background: #fff; margin-top: auto; }
+.composer-shell { min-height: 100%; color: var(--ui-text); }
+.scenario-select-page, .request-workspace { min-height: 100%; }
+.scenario-select-page { padding: 24px 28px 90px; }
+.page-header { margin-bottom: 18px; }
+.page-header h1 { margin: 0; font-size: 20px; font-weight: 600; }
+.page-header p { margin: 5px 0 0; color: var(--ui-text-secondary); font-size: 12px; }
+.catalog-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
+.catalog-main, .scenario-inspector { background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: var(--ui-radius-panel); }
+.filter-bar { height: 52px; padding: 9px 12px; display: flex; gap: 8px; align-items: center; border-bottom: 1px solid var(--ui-border); }
+.scenario-table { overflow: hidden; }
+.scenario-grid { display: grid; grid-template-columns: 28px minmax(200px, 1.6fr) 90px 110px 90px minmax(130px,1fr) 78px; gap: 10px; align-items: center; }
+.scenario-header { padding: 9px 12px; background: var(--ui-surface-muted); color: var(--ui-text-secondary); font-size: 12px; border-bottom: 1px solid var(--ui-border); }
+.scenario-row { width: 100%; border: 0; border-bottom: 1px solid var(--ui-border-subtle); background: var(--ui-surface); padding: 11px 12px; text-align: left; color: var(--ui-text-secondary); font: inherit; font-size: 12px; cursor: pointer; }
+.scenario-row:hover { background: var(--ui-surface-muted); }.scenario-row.selected { background: var(--ui-selected-bg); }
+.radio-mark { width: 16px; height: 16px; border: 1px solid var(--ui-border-control); border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+.radio-mark span { width: 8px; height: 8px; background: var(--ui-brand); border-radius: 50%; }
+.scene-identity { display: flex; flex-direction: column; min-width: 0; color: var(--ui-text); }.scene-identity strong { font-size: 13px; font-weight: 500; }.scene-identity span { color: var(--ui-text-tertiary); font-family: var(--ui-font-mono); font-size: 10px; margin-top: 2px; }
+.version-token, .reference-token { display: inline-block; width: fit-content; background: var(--ui-surface-muted); border: 1px solid var(--ui-border); border-radius: 3px; color: var(--ui-text-secondary); padding: 2px 6px; font-family: var(--ui-font-mono); font-size: 11px; white-space: nowrap; }
+.state-ok { color: var(--ui-success); display: inline-flex; align-items: center; gap: 3px; font-size: 11px; }
+.scenario-inspector { padding: 16px; position: sticky; top: 16px; }
+.inspector-title, .inspector-label { color: var(--ui-text-tertiary); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+.scenario-inspector h2 { margin: 8px 0 3px; font-size: 16px; }.inspector-key { font-family: var(--ui-font-mono); color: var(--ui-text-tertiary); font-size: 10px; margin-bottom: 14px; }
+.snapshot-kv { display: grid; grid-template-columns: 110px minmax(0,1fr); gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--ui-border-subtle); font-size: 12px; }.snapshot-kv span { color: var(--ui-text-tertiary); }.snapshot-kv strong { font-weight: 500; overflow-wrap: anywhere; }
+.mono { font-family: var(--ui-font-mono); font-size: 11px; }.inspector-divider { height: 1px; background: var(--ui-border); margin: 14px 0; }
+.runtime-sequence { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; margin-top: 8px; font-size: 11px; color: var(--ui-text-secondary); }.runtime-sequence .el-icon { color: var(--ui-text-tertiary); }
+.snapshot-note, .submit-note { margin-top: 14px; padding: 10px; background: var(--ui-surface-muted); border: 1px solid var(--ui-border-subtle); border-radius: 4px; color: var(--ui-text-secondary); font-size: 11px; line-height: 1.5; display: flex; gap: 6px; }
+.inspector-empty { color: var(--ui-text-tertiary); font-size: 12px; padding: 40px 10px; text-align: center; }
+.bottom-actions { position: fixed; left: 220px; right: 0; bottom: 0; min-height: 56px; padding: 10px 28px; background: var(--ui-surface); border-top: 1px solid var(--ui-border); display: flex; align-items: center; justify-content: flex-end; gap: 8px; z-index: 3; }
+.context-header { min-height: 62px; background: var(--ui-surface); border-bottom: 1px solid var(--ui-border); display: flex; justify-content: space-between; align-items: center; padding: 9px 20px; position: sticky; top: 0; z-index: 4; }
+.context-left, .context-line, .context-actions { display: flex; align-items: center; }.context-left { gap: 10px; }.context-line { gap: 8px; font-size: 13px; }.context-label { color: var(--ui-text-tertiary); font-size: 11px; }.context-sub { color: var(--ui-text-tertiary); font-family: var(--ui-font-mono); font-size: 10px; margin-top: 3px; }.context-actions { gap: 8px; }
+.back-button { width: 28px; height: 28px; border: 1px solid var(--ui-border); border-radius: 4px; background: var(--ui-surface); color: var(--ui-text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; }.readonly-state { display: inline-flex; gap: 3px; align-items: center; color: var(--ui-text-tertiary); font-size: 10px; }
+.wizard-layout { display: grid; grid-template-columns: 220px minmax(0,1fr); min-height: calc(100vh - 110px); }.wizard-steps { background: var(--ui-surface); border-right: 1px solid var(--ui-border); padding: 16px 0; }.steps-title { padding: 0 16px 10px; font-size: 12px; font-weight: 600; }
+.wizard-step { width: 100%; border: 0; border-left: 2px solid transparent; background: transparent; padding: 9px 14px; display: grid; grid-template-columns: 24px minmax(0,1fr); gap: 8px; text-align: left; cursor: pointer; color: var(--ui-text); }.wizard-step.active { background: var(--ui-selected-bg); border-left-color: var(--ui-brand); }.wizard-step.done .step-index { color: var(--ui-success); }.wizard-step strong { display: block; font-size: 12px; font-weight: 500; }.wizard-step small { display: block; color: var(--ui-text-tertiary); font-size: 9px; font-family: var(--ui-font-mono); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.step-index { width: 20px; height: 20px; border: 1px solid var(--ui-border); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; color: var(--ui-text-tertiary); }.steps-note { margin: 14px; padding: 10px; border-top: 1px solid var(--ui-border-subtle); color: var(--ui-text-tertiary); font-size: 10px; line-height: 1.5; }
+.wizard-main { min-width: 0; padding: 24px 28px 80px; }.wizard-section { max-width: 980px; margin: 0 auto; }.section-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }.section-head h2 { margin: 0; font-size: 18px; }.section-head p { margin: 4px 0 0; color: var(--ui-text-secondary); font-size: 12px; }.mono-inline { font-family: var(--ui-font-mono); color: var(--ui-text-secondary); }
+.schema-form { max-width: 760px; padding: 18px 20px; background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: var(--ui-radius-panel); }.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }.span-2 { grid-column: span 2; }
+.mono-sub { font-family: var(--ui-font-mono); font-size: 10px; color: var(--ui-text-tertiary); margin-top: 2px; }.table-help { margin-top: 8px; color: var(--ui-text-tertiary); font-size: 11px; }
+.confirm-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); border: 1px solid var(--ui-border); border-radius: var(--ui-radius-panel); background: var(--ui-surface); overflow: hidden; }.confirm-block { padding: 14px; border-right: 1px solid var(--ui-border-subtle); display: flex; flex-direction: column; gap: 4px; }.confirm-block:last-child { border-right: 0; }.confirm-block > span { color: var(--ui-text-tertiary); font-size: 11px; }.confirm-block strong { font-size: 12px; font-weight: 500; }.confirm-block small { color: var(--ui-text-tertiary); font-size: 10px; }
+.process-preview { margin-top: 14px; background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: var(--ui-radius-panel); padding: 14px; }.preview-title { font-size: 12px; font-weight: 600; margin-bottom: 12px; }.process-nodes { display: flex; align-items: center; gap: 7px; overflow-x: auto; }.process-node { min-width: 120px; border: 1px solid var(--ui-border); border-radius: 4px; padding: 9px; display: flex; flex-direction: column; gap: 3px; }.process-node span { color: var(--ui-text-tertiary); font-size: 9px; }.process-node strong { font-size: 11px; font-weight: 500; }.process-nodes > .el-icon { color: var(--ui-text-tertiary); flex: 0 0 auto; }
+.wizard-actions { position: fixed; left: 440px; right: 0; bottom: 0; min-height: 56px; background: var(--ui-surface); border-top: 1px solid var(--ui-border); padding: 10px 28px; display: flex; justify-content: flex-end; gap: 8px; z-index: 3; }
+@media (max-width: 1180px) { .catalog-layout { grid-template-columns: 1fr; }.scenario-inspector { position: static; }.scenario-grid { grid-template-columns: 28px minmax(180px,1.5fr) 80px 100px 90px 1fr; }.scenario-grid > :last-child { display:none; }.confirm-grid { grid-template-columns: 1fr 1fr; }.confirm-block:nth-child(2) { border-right:0; }.wizard-actions { left: 440px; } }
 </style>
