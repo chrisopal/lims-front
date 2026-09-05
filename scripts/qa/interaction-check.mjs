@@ -22,6 +22,15 @@ for (const width of [1440, 390]) {
     const fits = async selector => {
       const el = page.locator(selector).first();
       await el.waitFor({ state: 'visible' });
+      // Element Plus drawers are visible while still translated offscreen.
+      // Wait for settled geometry instead of mistaking the opening transition
+      // for a permanent layout failure. The size/bounds acceptance is unchanged.
+      await page.waitForFunction(sel => {
+        const element = document.querySelector(sel);
+        if (!element) return false;
+        const r = element.getBoundingClientRect();
+        return r.width >= 200 && r.x >= -2 && r.right <= innerWidth + 2;
+      }, selector, { timeout: 4000 });
       const r = await el.boundingBox();
       assert(r && r.width >= 200 && r.x >= -2 && r.x + r.width <= width + 2, `${selector} does not fit viewport: ${JSON.stringify(r)}`);
     };
