@@ -1,4 +1,9 @@
+@import './styles/enterprise-responsive.css';
+
 :root {
+  --ui-font-mono: 'SFMono-Regular', Consolas, monospace;
+  --ui-border-strong: #A7B2C3;
+  --ui-overlay: rgba(11, 18, 32, 0.48);
   --ui-font-sans: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   --ui-font-body: 14px;
   --ui-font-label: 13px;
@@ -53,19 +58,9 @@
   --ui-disabled-text: #68758A;
 }
 
-* {
-  box-sizing: border-box;
-}
-
-html,
-body,
-#root,
-#app {
-  height: 100%;
-}
-
-html,
-body {
+* { box-sizing: border-box; }
+html, body, #root, #app { height: 100%; }
+html, body {
   margin: 0;
   font-family: var(--ui-font-sans);
   font-size: var(--ui-font-body);
@@ -75,13 +70,7 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
-
-button,
-input,
-textarea,
-select {
-  font: inherit;
-}
+button, input, textarea, select { font: inherit; }
 
 /* Element Plus theme alignment: semantic blue + neutral enterprise surfaces. */
 :root {
@@ -103,79 +92,17 @@ select {
   --el-bg-color-page: var(--ui-canvas);
   --el-border-radius-base: var(--ui-radius-control);
 }
-
-.el-menu {
-  border-right: none !important;
-}
-
-.el-button {
-  min-height: var(--ui-control-md);
-  border-radius: var(--ui-radius-control);
-  font-weight: 500;
-}
-
-.el-button--primary {
-  background: var(--ui-action-solid);
-  border-color: var(--ui-action-solid);
-  color: var(--ui-on-action);
-}
-
-.el-button--primary:hover,
-.el-button--primary:focus {
-  background: var(--ui-action-solid-hover);
-  border-color: var(--ui-action-solid-hover);
-}
-
-.el-table th.el-table__cell {
-  background: #F8FAFB !important;
-  color: var(--ui-text-secondary) !important;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.el-table td.el-table__cell {
-  color: var(--ui-text);
-}
-
-.el-tag {
-  border-radius: var(--ui-radius-tag);
-  font-weight: 500;
-}
-
-.el-card,
-.el-dialog,
-.el-drawer {
-  border-radius: var(--ui-radius-panel);
-}
-
-.el-input__wrapper,
-.el-select__wrapper,
-.el-textarea__inner {
-  border-radius: var(--ui-radius-control);
-}
-
-.el-button:focus-visible,
-.el-input__wrapper:has(input:focus-visible),
-.el-select__wrapper:focus-within {
-  outline: 2px solid var(--ui-action-text);
-  outline-offset: 2px;
-}
-
-/* Scrollbars stay neutral and unobtrusive. */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--ui-border);
-  border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #B0B9C6;
-}
+.el-menu { border-right: none !important; }
+.el-button { min-height: var(--ui-control-md); border-radius: var(--ui-radius-control); font-weight: 500; }
+.el-button--primary { background: var(--ui-action-solid); border-color: var(--ui-action-solid); color: var(--ui-on-action); }
+.el-button--primary:hover, .el-button--primary:focus { background: var(--ui-action-solid-hover); border-color: var(--ui-action-solid-hover); }
+.el-table th.el-table__cell { background: #F8FAFB !important; color: var(--ui-text-secondary) !important; font-size: 12px; font-weight: 500; }
+.el-table td.el-table__cell { color: var(--ui-text); }
+.el-tag { border-radius: var(--ui-radius-tag); font-weight: 500; }
+.el-card, .el-dialog, .el-drawer { border-radius: var(--ui-radius-panel); }
+.el-input__wrapper, .el-select__wrapper, .el-textarea__inner { border-radius: var(--ui-radius-control); }
+.el-button:focus-visible, .el-input__wrapper:has(input:focus-visible), .el-select__wrapper:focus-within { outline: 2px solid var(--ui-action-text); outline-offset: 2px; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--ui-border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #B0B9C6; }
