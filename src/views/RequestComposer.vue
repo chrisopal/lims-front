@@ -1,317 +1,84 @@
 <template>
   <div class="composer-shell">
-    <section v-if="stage === 'select'" class="scenario-select-page">
-      <div class="page-header">
-        <div>
-          <h1>新建委托 / 申请</h1>
-          <p>先选择一个已发布且已激活的场景。场景版本决定后续表单、对象模型、检测项与运行流程。</p>
-        </div>
-      </div>
-
+    <LocalDemoNotice />
+    <div v-if="runtimeError || actionError" class="runtime-error" role="alert">{{ runtimeError || actionError }}</div>
+    <section v-if="stage==='select'" class="scenario-select-page">
+      <header class="page-header"><h1>新建委托 / 申请</h1><p>选择已激活的演示场景，创建独立草稿。提交后生成本浏览器中的委托和工作项。</p></header>
+      <section v-if="savedDrafts.length" class="saved-drafts" aria-label="已保存草稿">
+        <h2>继续填写草稿 <span>{{ savedDrafts.length }}</span></h2>
+        <div v-for="d in savedDrafts" :key="d.id" class="draft-row"><div><strong>{{d.snapshot.name}} {{d.snapshot.version}}</strong><small>{{d.data.customer || d.data.department || '未填写委托方'}} · {{new Date(d.updatedAt).toLocaleString('zh-CN')}}</small></div><el-button size="small" @click="router.push({path:'/app/operations/requests',query:{draftId:d.id}})">继续填写</el-button></div>
+      </section>
       <div class="catalog-layout">
         <div class="catalog-main">
-          <div class="filter-bar">
-            <el-input v-model="search" placeholder="搜索场景名称 / Key" clearable size="small" style="width: 260px" prefix-icon="Search" />
-            <el-select v-model="domainFilter" placeholder="领域" clearable size="small" style="width: 150px">
-              <el-option label="食品检测" value="食品检测" />
-              <el-option label="环境检测" value="环境检测" />
-              <el-option label="几何量" value="几何量" />
-            </el-select>
-            <el-select v-model="modeFilter" placeholder="业务模式" clearable size="small" style="width: 160px">
-              <el-option label="第三方委托" value="第三方委托" />
-              <el-option label="企业内部" value="企业内部" />
-            </el-select>
-          </div>
-
-          <div class="scenario-table">
-            <div class="scenario-header scenario-grid">
-              <span></span><span>场景</span><span>版本</span><span>业务模式</span><span>领域</span><span>激活范围</span><span>状态</span>
-            </div>
-            <button
-              v-for="scene in filteredScenes"
-              :key="scene.id"
-              :class="['scenario-row', 'scenario-grid', { selected: selectedScene?.id === scene.id }]"
-              @click="selectedScene = scene"
-            >
-              <span class="radio-mark"><span v-if="selectedScene?.id === scene.id"></span></span>
-              <span class="scene-identity"><strong>{{ scene.name }}</strong><span>{{ scene.key }}</span></span>
-              <span class="version-token">{{ scene.version }}</span>
-              <span>{{ scene.mode }}</span>
-              <span>{{ scene.domain }}</span>
-              <span>{{ scene.activationScope }}</span>
-              <span class="state-ok"><el-icon><CircleCheck /></el-icon>可用</span>
-            </button>
+          <div class="filter-bar"><el-input v-model="search" placeholder="搜索场景名称 / Key" clearable prefix-icon="Search"/><el-select v-model="domainFilter" placeholder="领域" clearable><el-option v-for="domain in ['食品检测','环境检测','几何量']" :key="domain" :label="domain" :value="domain"/></el-select><el-select v-model="modeFilter" placeholder="业务模式" clearable><el-option v-for="mode in ['第三方委托','企业内部']" :key="mode" :label="mode" :value="mode"/></el-select></div>
+          <div class="scenario-table"><div class="scenario-header scenario-grid"><span></span><span>场景</span><span>版本</span><span>业务模式</span><span>领域</span></div>
+            <button v-for="scene in filteredScenes" :key="scene.id" :aria-pressed="selectedScene?.id===scene.id" :class="['scenario-row','scenario-grid',{selected:selectedScene?.id===scene.id}]" @click="selectedScene=scene"><span class="radio-mark"><span v-if="selectedScene?.id===scene.id"></span></span><span class="scene-identity"><strong>{{scene.name}}</strong><small>{{scene.key}}</small></span><span class="version-token">{{scene.version}}</span><span>{{scene.mode}}</span><span>{{scene.domain}}</span></button>
+            <el-empty v-if="!filteredScenes.length" description="没有匹配的演示场景，请调整筛选" :image-size="48"/>
           </div>
         </div>
-
-        <aside class="scenario-inspector">
-          <template v-if="selectedScene">
-            <div class="inspector-title">场景快照</div>
-            <h2>{{ selectedScene.name }}</h2>
-            <div class="inspector-key">{{ selectedScene.key }}</div>
-            <div class="snapshot-kv"><span>Published Version</span><strong>{{ selectedScene.version }}</strong></div>
-            <div class="snapshot-kv"><span>Snapshot Hash</span><strong class="mono">sha256:{{ selectedScene.hash }}</strong></div>
-            <div class="snapshot-kv"><span>检测项</span><strong>{{ selectedScene.testItems.length }} 项</strong></div>
-            <div class="snapshot-kv"><span>流程版本</span><strong>{{ selectedScene.workflowVersion }}</strong></div>
-            <div class="snapshot-kv"><span>运行步骤</span><strong>{{ selectedScene.runtimeSteps.length }} 步</strong></div>
-            <div class="inspector-divider"></div>
-            <div class="inspector-label">运行流程</div>
-            <div class="runtime-sequence">
-              <template v-for="(node, index) in selectedScene.runtimeSteps" :key="node">
-                <span>{{ node }}</span><el-icon v-if="index < selectedScene.runtimeSteps.length - 1"><ArrowRight /></el-icon>
-              </template>
-            </div>
-            <div class="snapshot-note"><el-icon><Lock /></el-icon>提交后将把该 Scenario Snapshot 绑定到业务记录，后续新版本不会影响本次委托。</div>
-          </template>
-          <div v-else class="inspector-empty">请选择一个场景查看快照信息。</div>
-        </aside>
+        <aside class="scenario-inspector"><template v-if="selectedScene"><h2>{{selectedScene.name}}</h2><p class="mono">{{selectedScene.key}}</p><dl><dt>Published Version</dt><dd>{{selectedScene.version}}</dd><dt>快照引用（演示）</dt><dd class="mono">{{selectedScene.snapshotRef}}</dd><dt>激活范围（样例）</dt><dd>{{selectedScene.activationScope}}</dd><dt>流程版本</dt><dd>{{selectedScene.workflowVersion}}</dd><dt>检测项 / 流程节点</dt><dd>{{selectedScene.testItems.length}} / {{selectedScene.nodes.length}}</dd></dl><h3>运行流程</h3><div class="runtime-sequence"><span v-for="(node,i) in selectedScene.nodes" :key="node.key">{{i+1}}. {{node.label}}</span></div><p class="snapshot-note">草稿保存当前场景的副本，不自动升级到新版本。该引用不是数字签名。</p></template><el-empty v-else description="选择场景后查看配置摘要" :image-size="48"/></aside>
       </div>
-
-      <div class="bottom-actions">
-        <el-button @click="router.back()">取消</el-button>
-        <el-button type="primary" :disabled="!selectedScene" @click="startRequest">使用此场景</el-button>
-      </div>
+      <div class="bottom-actions"><el-button @click="router.back()">取消</el-button><el-button type="primary" :disabled="!selectedScene || !!runtimeError" :loading="busy" @click="startRequest">使用此场景</el-button></div>
     </section>
-
     <section v-else class="request-workspace">
-      <header class="context-header">
-        <div class="context-left">
-          <button class="back-button" @click="stage = 'select'"><el-icon><ArrowLeft /></el-icon></button>
-          <div>
-            <div class="context-line"><span class="context-label">场景</span><strong>{{ selectedScene?.name }}</strong><span class="version-token">{{ selectedScene?.version }}</span><span class="readonly-state"><el-icon><Lock /></el-icon>Snapshot locked</span></div>
-            <div class="context-sub">{{ selectedScene?.key }} · sha256:{{ selectedScene?.hash }} · Workflow {{ selectedScene?.workflowVersion }}</div>
-          </div>
-        </div>
-        <div class="context-actions"><el-button size="small">保存草稿</el-button><el-button type="primary" size="small" :disabled="currentStep !== wizardSteps.length" @click="submitRequest">提交</el-button></div>
-      </header>
-
-      <div class="wizard-layout">
-        <aside class="wizard-steps">
-          <div class="steps-title">委托配置</div>
-          <button v-for="(step, index) in wizardSteps" :key="step.key" :class="['wizard-step', { active: currentStep === index + 1, done: currentStep > index + 1 }]" @click="currentStep > index + 1 && (currentStep = index + 1)">
-            <span class="step-index"><el-icon v-if="currentStep > index + 1"><Check /></el-icon><span v-else>{{ index + 1 }}</span></span>
-            <span><strong>{{ step.name }}</strong><small>{{ step.source }}</small></span>
-          </button>
-          <div class="steps-note">向导来自当前场景的 runtime.request.setup 配置，通用前端不硬编码 Food / Environment / Metrology 字段。</div>
-        </aside>
-
+      <header class="context-header"><div class="context-left"><button class="back-button" aria-label="返回场景选择" @click="chooseAnotherScene"><el-icon><ArrowLeft/></el-icon></button><div><div class="context-line"><strong>{{selectedScene?.name}}</strong><span class="version-token">{{selectedScene?.version}}</span><span>场景版本已绑定</span></div><div class="context-sub">{{selectedScene?.snapshotRef}} · {{selectedScene?.workflowVersion}}</div></div></div><div class="context-actions"><span class="save-state" role="status">{{dirty?'有未保存修改':'草稿已保存到本浏览器'}}</span><el-button :loading="busy" @click="saveDraft">保存草稿</el-button></div></header>
+      <div class="wizard-layout"><aside class="wizard-steps"><div class="steps-title">委托配置</div><button v-for="(step,index) in wizardSteps" :key="step.key" :class="['wizard-step',{active:currentStep===index+1,done:currentStep>index+1}]" @click="currentStep>index+1 && (currentStep=index+1)"><span class="step-index">{{index+1}}</span><span><strong>{{step.name}}</strong><small>{{step.source}}</small></span></button><p class="steps-note">四步委托向导复用场景表单与节点定义。完整 Manifest 运行时由后续后端提供。</p></aside>
         <main class="wizard-main">
-          <div v-if="currentStep === 1" class="wizard-section">
-            <div class="section-head"><div><h2>委托基本信息</h2><p>由 <span class="mono-inline">{{ selectedScene?.requestSchema }}</span> 渲染。</p></div></div>
-            <div class="schema-form">
-              <el-form label-position="top" size="small">
-                <div class="form-grid">
-                  <el-form-item v-for="field in selectedScene?.requestFields" :key="field.key" :label="field.label" :required="field.required" :class="{ 'span-2': field.span === 2 }">
-                    <el-input v-if="field.type === 'text'" v-model="requestData[field.key]" :placeholder="field.placeholder || ''" />
-                    <el-input v-else-if="field.type === 'textarea'" v-model="requestData[field.key]" type="textarea" :rows="3" :placeholder="field.placeholder || ''" />
-                    <el-select v-else-if="field.type === 'select'" v-model="requestData[field.key]" style="width:100%" placeholder="请选择"><el-option v-for="option in field.options" :key="option" :label="option" :value="option" /></el-select>
-                    <el-date-picker v-else-if="field.type === 'date'" v-model="requestData[field.key]" type="date" style="width:100%" placeholder="选择日期" />
-                  </el-form-item>
-                </div>
-              </el-form>
-            </div>
-          </div>
-
-          <div v-else-if="currentStep === 2" class="wizard-section">
-            <div class="section-head"><div><h2>{{ selectedScene?.subjectLabel }}</h2><p>对象结构来自 <span class="mono-inline">{{ selectedScene?.subjectSchema }}</span>。</p></div><el-button type="primary" size="small" @click="addSubject">添加对象</el-button></div>
-            <el-table :data="subjects" border size="small">
-              <el-table-column type="index" label="#" width="45" />
-              <el-table-column v-for="field in selectedScene?.subjectFields" :key="field.key" :label="field.label" :min-width="field.width || 130">
-                <template #default="{ row }">
-                  <el-input v-if="field.type === 'text'" v-model="row[field.key]" size="small" :placeholder="field.placeholder || ''" />
-                  <el-select v-else v-model="row[field.key]" size="small" style="width:100%" placeholder="请选择"><el-option v-for="option in field.options" :key="option" :label="option" :value="option" /></el-select>
-                </template>
-              </el-table-column>
-              <el-table-column label="操作" width="70"><template #default="{ $index }"><el-button link type="danger" size="small" @click="subjects.splice($index,1)">删除</el-button></template></el-table-column>
-            </el-table>
-          </div>
-
-          <div v-else-if="currentStep === 3" class="wizard-section">
-            <div class="section-head"><div><h2>检测项</h2><p>只展示当前 Scenario Snapshot 已发布的能力，标准、方法与限值版本不可在委托时随意替换。</p></div></div>
-            <el-table :data="selectedScene?.testItems || []" border size="small" @selection-change="selectedItems = $event">
-              <el-table-column type="selection" width="44" />
-              <el-table-column prop="name" label="检测项" min-width="130"><template #default="{ row }"><strong>{{ row.name }}</strong><div class="mono-sub">{{ row.code }}</div></template></el-table-column>
-              <el-table-column label="标准版本" min-width="170"><template #default="{ row }"><span class="reference-token">{{ row.standard }}</span></template></el-table-column>
-              <el-table-column label="方法版本" min-width="160"><template #default="{ row }"><span class="reference-token">{{ row.method }}</span></template></el-table-column>
-              <el-table-column label="限值规则" min-width="150"><template #default="{ row }"><span class="reference-token">{{ row.limit }}</span></template></el-table-column>
-            </el-table>
-            <div class="table-help">默认按场景预选常用检测项；用户只能在已发布能力范围内选择。</div>
-          </div>
-
-          <div v-else class="wizard-section">
-            <div class="section-head"><div><h2>确认并启动流程</h2><p>提交后创建 TestRequest，并基于锁定的 Scenario Snapshot 创建 Process Instance。</p></div></div>
-            <div class="confirm-grid">
-              <div class="confirm-block"><span>场景</span><strong>{{ selectedScene?.name }} {{ selectedScene?.version }}</strong><small>{{ selectedScene?.key }}</small></div>
-              <div class="confirm-block"><span>Snapshot</span><strong class="mono">sha256:{{ selectedScene?.hash }}</strong><small>不可变</small></div>
-              <div class="confirm-block"><span>检测对象</span><strong>{{ subjects.length }} 个</strong><small>{{ selectedScene?.subjectLabel }}</small></div>
-              <div class="confirm-block"><span>检测项</span><strong>{{ selectedItems.length || selectedScene?.testItems.length }} 项</strong><small>版本已锁定</small></div>
-            </div>
-            <div class="process-preview">
-              <div class="preview-title">将启动的运行流程</div>
-              <div class="process-nodes"><template v-for="(node,index) in selectedScene?.runtimeSteps" :key="node"><div class="process-node"><span>{{ index + 1 }}</span><strong>{{ node }}</strong></div><el-icon v-if="index < (selectedScene?.runtimeSteps.length || 0)-1"><ArrowRight /></el-icon></template></div>
-            </div>
-            <div class="submit-note"><el-icon><InfoFilled /></el-icon>运行时每个节点将通过 Node Type Registry 解析 Executor 与 Runtime Renderer；人工任务进入“我的工作”。</div>
-          </div>
-
-          <div class="wizard-actions">
-            <el-button @click="currentStep === 1 ? stage = 'select' : currentStep--">上一步</el-button>
-            <el-button v-if="currentStep < wizardSteps.length" type="primary" @click="currentStep++">下一步</el-button>
-            <el-button v-else type="primary" @click="submitRequest">提交并启动流程</el-button>
-          </div>
+          <div v-if="issues.length" ref="errorSummary" class="validation-list" role="alert" tabindex="-1"><strong>请先修正以下信息</strong><div v-for="i in issues" :key="i.path">{{i.message}}</div></div>
+          <section v-if="currentStep===1" class="wizard-section"><div class="section-head"><div><h2>委托基本信息</h2><p>表单版本：{{selectedScene?.requestSchema}}</p></div></div><div class="schema-form"><SchemaFields :fields="selectedScene?.requestFields || []" v-model="requestData" prefix="request" :issues="issues"/></div></section>
+          <section v-else-if="currentStep===2" class="wizard-section"><div class="section-head"><div><h2>{{selectedScene?.subjectLabel}}</h2><p>对象表单：{{selectedScene?.subjectSchema}}</p></div><el-button type="primary" @click="addSubject">添加对象</el-button></div><div class="table-container"><el-table :data="subjects" border><el-table-column type="index" label="#" width="45"/><el-table-column v-for="field in selectedScene?.subjectFields" :key="field.key" :label="field.label" :min-width="field.width || 130"><template #default="{row,$index}"><el-input v-if="field.type==='text'" v-model="row[field.key]" :maxlength="4000" :aria-label="field.label"/><el-select v-else v-model="row[field.key]" placeholder="请选择" :aria-label="field.label"><el-option v-for="option in field.options" :key="option" :label="option" :value="option"/></el-select><small v-if="subjectError($index,field.key)" class="field-error">{{subjectError($index,field.key)}}</small></template></el-table-column><el-table-column label="操作" width="70"><template #default="{$index}"><el-button link type="danger" @click="subjects.splice($index,1)">删除</el-button></template></el-table-column></el-table></div></section>
+          <section v-else-if="currentStep===3" class="wizard-section"><div class="section-head"><div><h2>检测项</h2><p>只从当前场景副本选择检测项。标准、方法标签为样例，未经法规核验。</p></div></div><div class="table-container"><TestItemSelection :items="selectedScene?.testItems || []" v-model="selectedItems" /></div><p class="table-help">已选 {{selectedItems.length}} 项。取消全选不会自动恢复为全选。</p></section>
+          <section v-else class="wizard-section"><div class="section-head"><div><h2>确认并启动流程</h2><p>提交后保存本地委托并创建首个工作项；不调用后台流程引擎。</p></div></div><div class="confirm-grid"><div class="confirm-block"><span>场景</span><strong>{{selectedScene?.name}} {{selectedScene?.version}}</strong></div><div class="confirm-block"><span>快照引用</span><strong class="mono">{{selectedScene?.snapshotRef}}</strong><small>场景副本 · 未签名</small></div><div class="confirm-block"><span>检测对象</span><strong>{{subjects.length}} 个</strong></div><div class="confirm-block"><span>检测项</span><strong>{{selectedItems.length}} 项</strong></div></div><div class="process-preview"><h3>运行流程（本地顺序演示）</h3><div class="process-nodes"><div v-for="(node,index) in selectedScene?.nodes" :key="node.key" class="process-node"><span>{{index+1}}</span><strong>{{node.label}}</strong></div></div></div><p class="submit-note">本地记录不代表实际检测、Java Executor 执行、权限授权、质量放行或报告签发。</p></section>
+          <footer class="wizard-actions"><el-button @click="previousStep">上一步</el-button><el-button v-if="currentStep<wizardSteps.length" type="primary" :loading="busy" @click="nextStep">下一步</el-button><el-button v-else type="primary" :loading="busy" @click="submitRequest">提交并创建本地工作项</el-button></footer>
         </main>
       </div>
     </section>
   </div>
 </template>
-
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
-
-const router = useRouter()
-const stage = ref<'select' | 'wizard'>('select')
-const currentStep = ref(1)
-const search = ref('')
-const domainFilter = ref('')
-const modeFilter = ref('')
-const selectedScene = ref<any>(null)
-const requestData = reactive<Record<string, any>>({})
-const subjects = ref<any[]>([])
-const selectedItems = ref<any[]>([])
-
-const publishedScenes = ref([
-  {
-    id: 1, name: '第三方食品理化检测', key: 'third-party-food-physchem', version: 'v1.2.0', hash: '7fa3c2d9', mode: '第三方委托', domain: '食品检测', activationScope: '华东食品实验室', workflowVersion: 'food-flow v1.4',
-    requestSchema: 'third-party-request-intake · v3', subjectSchema: 'food-sample-intake · v3', subjectLabel: '食品样品',
-    requestFields: [
-      { key: 'customer', label: '委托方名称', type: 'text', required: true, placeholder: '请输入委托方全称' },
-      { key: 'contact', label: '联系人', type: 'text', required: true },
-      { key: 'purpose', label: '检测目的', type: 'select', required: true, options: ['合规检测', '出口认证', '研发验证', '纠纷仲裁'] },
-      { key: 'dueDate', label: '期望完成日期', type: 'date', required: true },
-      { key: 'requirements', label: '特殊要求', type: 'textarea', span: 2, placeholder: '可选：报告语言、交付方式、特殊检测要求等' },
-    ],
-    subjectFields: [
-      { key: 'name', label: '样品名称', type: 'text', width: 160 },
-      { key: 'category', label: '食品类别', type: 'select', options: ['粮食及制品', '肉及肉制品', '水产品', '蔬菜', '饮料'], width: 150 },
-      { key: 'batch', label: '批次 / Lot', type: 'text', width: 130 },
-      { key: 'quantity', label: '数量', type: 'text', width: 90 },
-    ],
-    testItems: [
-      { code: 'FOOD.PB', name: '铅 Pb', standard: 'GB 5009.12-2023', method: 'ICP-MS Pb v2.1', limit: 'Food Pb Limit v3' },
-      { code: 'FOOD.CD', name: '镉 Cd', standard: 'GB 5009.15-2023', method: 'ICP-MS Cd v2.0', limit: 'Food Cd Limit v2' },
-      { code: 'FOOD.MOISTURE', name: '水分', standard: 'GB 5009.3-2016', method: 'Drying v3', limit: 'Product Spec v5' },
-    ],
-    runtimeSteps: ['委托受理', '收样', '样品前处理', '实验室检测', '技术审核', '报告签发'],
-  },
-  {
-    id: 2, name: '环境水质现场监测', key: 'environment-water-field', version: 'v2.0.1', hash: 'c3d45fe8', mode: '第三方委托', domain: '环境检测', activationScope: '深圳综合实验室', workflowVersion: 'env-field-flow v2.3',
-    requestSchema: 'environment-project-request · v2', subjectSchema: 'sampling-point · v4', subjectLabel: '采样点位',
-    requestFields: [
-      { key: 'customer', label: '委托单位', type: 'text', required: true },
-      { key: 'project', label: '监测项目', type: 'text', required: true },
-      { key: 'monitoringType', label: '监测类型', type: 'select', required: true, options: ['地表水', '地下水', '工业废水', '生活污水'] },
-      { key: 'dueDate', label: '计划完成日期', type: 'date', required: true },
-      { key: 'requirements', label: '现场要求', type: 'textarea', span: 2 },
-    ],
-    subjectFields: [
-      { key: 'pointCode', label: '点位编号', type: 'text', width: 120 },
-      { key: 'pointName', label: '点位名称', type: 'text', width: 160 },
-      { key: 'pointType', label: '点位类型', type: 'select', options: ['地表水', '地下水', '排放口'], width: 130 },
-      { key: 'location', label: '位置描述', type: 'text', width: 180 },
-    ],
-    testItems: [
-      { code: 'ENV.COD', name: 'COD', standard: 'HJ 828-2017', method: 'Dichromate v2', limit: 'Discharge COD v4' },
-      { code: 'ENV.NH3N', name: '氨氮', standard: 'HJ 535-2009', method: 'Nessler v2', limit: 'Discharge NH3N v3' },
-    ],
-    runtimeSteps: ['监测方案', '现场采样', '样品运输', '实验室接收', '实验室检测', '技术审核', '报告签发'],
-  },
-  {
-    id: 3, name: '企业内部几何量检测', key: 'internal-metrology', version: 'v2.1.0', hash: 'e9f01ac4', mode: '企业内部', domain: '几何量', activationScope: '北京计量实验室', workflowVersion: 'metrology-flow v2.1',
-    requestSchema: 'internal-metrology-request · v2', subjectSchema: 'metrology-part · v3', subjectLabel: '零件 / Part',
-    requestFields: [
-      { key: 'department', label: '申请部门', type: 'text', required: true },
-      { key: 'source', label: '来源业务', type: 'select', required: true, options: ['来料检验', '过程检验', '成品检验', '研发试验'] },
-      { key: 'workOrder', label: '工单 / 项目号', type: 'text' },
-      { key: 'dueDate', label: '要求完成日期', type: 'date', required: true },
-      { key: 'requirements', label: '测量要求', type: 'textarea', span: 2 },
-    ],
-    subjectFields: [
-      { key: 'partNo', label: '零件号', type: 'text', width: 130 },
-      { key: 'partName', label: '零件名称', type: 'text', width: 160 },
-      { key: 'serial', label: '序列号', type: 'text', width: 130 },
-      { key: 'drawing', label: '图纸版本', type: 'text', width: 110 },
-    ],
-    testItems: [
-      { code: 'MET.DIAMETER', name: '孔径', standard: 'Drawing Rev.C', method: 'CMM Dimension v4', limit: 'Tolerance Profile v7' },
-      { code: 'MET.FLATNESS', name: '平面度', standard: 'ISO 1101:2017', method: 'CMM GD&T v3', limit: 'Drawing Tolerance v5' },
-    ],
-    runtimeSteps: ['内部申请', '任务策划', 'CMM 测量', '结果判定', '技术审核', '结果回写'],
-  },
-])
-
-const filteredScenes = computed(() => publishedScenes.value.filter(scene => {
-  const text = `${scene.name} ${scene.key}`.toLowerCase()
-  return (!search.value || text.includes(search.value.toLowerCase())) && (!domainFilter.value || scene.domain === domainFilter.value) && (!modeFilter.value || scene.mode === modeFilter.value)
-}))
-
-const wizardSteps = computed(() => [
-  { key: 'request', name: '基本信息', source: selectedScene.value?.requestSchema || '' },
-  { key: 'subject', name: selectedScene.value?.subjectLabel || '检测对象', source: selectedScene.value?.subjectSchema || '' },
-  { key: 'items', name: '检测项', source: 'Scenario Snapshot' },
-  { key: 'confirm', name: '确认与启动', source: 'Process Runtime' },
-])
-
-function startRequest() {
-  if (!selectedScene.value) return
-  stage.value = 'wizard'
-  currentStep.value = 1
-  subjects.value = [{}]
-  selectedItems.value = [...selectedScene.value.testItems]
-}
-function addSubject() { subjects.value.push({}) }
-function submitRequest() { router.push('/app/operations/my-work') }
+import {computed,ref,watch,nextTick,onMounted,onUnmounted} from 'vue';
+import {useRoute,useRouter,onBeforeRouteLeave,onBeforeRouteUpdate} from 'vue-router';
+import {ElMessageBox,ElMessage} from 'element-plus';
+import LocalDemoNotice from '@/components/runtime/LocalDemoNotice.vue';
+import SchemaFields from '@/components/runtime/SchemaFields.vue';
+import TestItemSelection from '@/components/runtime/TestItemSelection.vue';
+import {useLocalRuntime} from '@/composables/useLocalRuntime';
+import {clone,validateDraft} from '@/runtime/local-runtime';
+import type {Draft,Values,TestItem,ScenarioDefinition,Issue} from '@/runtime/local-runtime';
+import {demoScenarios} from '@/runtime/scenarios';
+const router=useRouter();const route=useRoute();const {state,error:runtimeError,repository}=useLocalRuntime();
+const stage=ref<'select'|'wizard'>('select');const currentStep=ref(1);
+const search=ref('');const domainFilter=ref('');const modeFilter=ref('');
+const selectedScene=ref<ScenarioDefinition|null>(null);const draft=ref<Draft|null>(null);
+const requestData=ref<Values>({});const subjects=ref<Values[]>([]);const selectedItems=ref<TestItem[]>([]);
+const busy=ref(false);const actionError=ref('');const issues=ref<Issue[]>([]);
+const errorSummary=ref<HTMLElement|null>(null);const savedSignature=ref('');
+const signature=()=>JSON.stringify({data:requestData.value,subjects:subjects.value,itemCodes:selectedItems.value.map(i=>i.code)});
+const dirty=computed(()=>!!draft.value&&signature()!==savedSignature.value);
+const savedDrafts=computed(()=>state.value.drafts.filter(d=>d.status==='DRAFT').slice().reverse());
+const filteredScenes=computed(()=>demoScenarios.filter(s=>s.active&&(!search.value||`${s.name} ${s.key}`.toLowerCase().includes(search.value.toLowerCase()))&&(!domainFilter.value||s.domain===domainFilter.value)&&(!modeFilter.value||s.mode===modeFilter.value)));
+const wizardSteps=computed(()=>[{key:'request',name:'基本信息',source:selectedScene.value?.requestSchema||''},{key:'subject',name:selectedScene.value?.subjectLabel||'检测对象',source:selectedScene.value?.subjectSchema||''},{key:'items',name:'检测项',source:'Scenario Snapshot'},{key:'confirm',name:'确认与启动',source:'本地运行演示'}]);
+function currentDraft():Draft {if(!draft.value)throw Error('请先选择场景');return {...clone(draft.value),data:clone(requestData.value),subjects:clone(subjects.value),itemCodes:selectedItems.value.map(t=>t.code)}}
+function applyDraft(d:Draft){draft.value=clone(d);selectedScene.value=clone(d.snapshot);requestData.value=clone(d.data);subjects.value=clone(d.subjects);selectedItems.value=d.snapshot.testItems.filter(t=>d.itemCodes.includes(t.code));savedSignature.value=signature();stage.value='wizard';currentStep.value=1;issues.value=[]}
+async function perform(job:()=>Promise<void>){if(busy.value)return;busy.value=true;actionError.value='';try{await job()}catch(e){actionError.value=e instanceof Error?e.message:'操作失败'}finally{busy.value=false}}
+async function startRequest(){if(!selectedScene.value)return;await perform(async()=>{const d=await repository.createDraft(selectedScene.value!);applyDraft(d);await router.replace({path:'/app/operations/requests',query:{draftId:d.id}})})}
+async function persistDraft(){const saved=await repository.saveDraft(currentDraft());draft.value=saved;savedSignature.value=signature();return saved}
+async function saveDraft(){await perform(async()=>{await persistDraft();ElMessage.success('草稿已保存到本浏览器')})}
+function addSubject(){subjects.value.push({})}
+function subjectError(index:number,key:string){return issues.value.find(i=>i.path===`subjects.${index}.${key}`)?.message}
+async function focusErrors(){await nextTick();errorSummary.value?.focus()}
+async function nextStep(){issues.value=validateDraft(currentDraft()).filter(i=>i.step===currentStep.value);if(issues.value.length){await focusErrors();return}currentStep.value++}
+async function confirmLeave(){if(!dirty.value)return true;try{await ElMessageBox.confirm('尚有未保存内容。离开会丢失本次修改，已保存草稿仍保留。','离开当前编辑？',{confirmButtonText:'离开',cancelButtonText:'继续编辑',type:'warning'});return true}catch{return false}}
+async function chooseAnotherScene(){if(!await confirmLeave())return;draft.value=null;selectedScene.value=null;stage.value='select';issues.value=[];savedSignature.value='';await router.replace({path:'/app/operations/requests',query:{}})}
+function previousStep(){if(currentStep.value===1)void chooseAnotherScene();else{currentStep.value--;issues.value=[]}}
+async function submitRequest(){issues.value=validateDraft(currentDraft());if(issues.value.length){currentStep.value=issues.value[0].step;await focusErrors();return}await perform(async()=>{const d=await persistDraft();const r=await repository.submitDraft(d.id,d.revision);draft.value=null;ElMessage.success(`本地委托 ${r.number} 已创建`);await router.push({path:'/app/operations/my-work',query:{requestId:r.id}})})}
+watch(()=>route.query.draftId,async id=>{if(typeof id!=='string'||id===draft.value?.id)return;try{const s=repository.read();const d=s.drafts.find(d=>d.id===id);if(!d)throw Error('草稿不存在或已在其他浏览器创建');if(d.status==='SUBMITTED'){const r=s.requests.find(r=>r.draftId===id);await router.replace({path:'/app/operations/my-work',query:{requestId:r?.id}});return}applyDraft(d)}catch(e){actionError.value=e instanceof Error?e.message:'读取失败'}},{immediate:true});
+onBeforeRouteLeave(confirmLeave);onBeforeRouteUpdate((to,from)=>to.query.draftId!==from.query.draftId?confirmLeave():true);
+function beforeUnload(e:BeforeUnloadEvent){if(dirty.value){e.preventDefault();e.returnValue=''}}
+onMounted(()=>window.addEventListener('beforeunload',beforeUnload));onUnmounted(()=>window.removeEventListener('beforeunload',beforeUnload));
 </script>
-
 <style scoped>
-.composer-shell { min-height: 100%; color: var(--ui-text); }
-.scenario-select-page, .request-workspace { min-height: 100%; }
-.scenario-select-page { padding: 24px 28px 90px; }
-.page-header { margin-bottom: 18px; }
-.page-header h1 { margin: 0; font-size: 20px; font-weight: 600; }
-.page-header p { margin: 5px 0 0; color: var(--ui-text-secondary); font-size: 12px; }
-.catalog-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
-.catalog-main, .scenario-inspector { background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: var(--ui-radius-panel); }
-.filter-bar { height: 52px; padding: 9px 12px; display: flex; gap: 8px; align-items: center; border-bottom: 1px solid var(--ui-border); }
-.scenario-table { overflow: hidden; }
-.scenario-grid { display: grid; grid-template-columns: 28px minmax(200px, 1.6fr) 90px 110px 90px minmax(130px,1fr) 78px; gap: 10px; align-items: center; }
-.scenario-header { padding: 9px 12px; background: var(--ui-surface-muted); color: var(--ui-text-secondary); font-size: 12px; border-bottom: 1px solid var(--ui-border); }
-.scenario-row { width: 100%; border: 0; border-bottom: 1px solid var(--ui-border-subtle); background: var(--ui-surface); padding: 11px 12px; text-align: left; color: var(--ui-text-secondary); font: inherit; font-size: 12px; cursor: pointer; }
-.scenario-row:hover { background: var(--ui-surface-muted); }.scenario-row.selected { background: var(--ui-selected-bg); }
-.radio-mark { width: 16px; height: 16px; border: 1px solid var(--ui-border-control); border-radius: 50%; display: flex; align-items: center; justify-content: center; }
-.radio-mark span { width: 8px; height: 8px; background: var(--ui-brand); border-radius: 50%; }
-.scene-identity { display: flex; flex-direction: column; min-width: 0; color: var(--ui-text); }.scene-identity strong { font-size: 13px; font-weight: 500; }.scene-identity span { color: var(--ui-text-tertiary); font-family: var(--ui-font-mono); font-size: 10px; margin-top: 2px; }
-.version-token, .reference-token { display: inline-block; width: fit-content; background: var(--ui-surface-muted); border: 1px solid var(--ui-border); border-radius: 3px; color: var(--ui-text-secondary); padding: 2px 6px; font-family: var(--ui-font-mono); font-size: 11px; white-space: nowrap; }
-.state-ok { color: var(--ui-success); display: inline-flex; align-items: center; gap: 3px; font-size: 11px; }
-.scenario-inspector { padding: 16px; position: sticky; top: 16px; }
-.inspector-title, .inspector-label { color: var(--ui-text-tertiary); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
-.scenario-inspector h2 { margin: 8px 0 3px; font-size: 16px; }.inspector-key { font-family: var(--ui-font-mono); color: var(--ui-text-tertiary); font-size: 10px; margin-bottom: 14px; }
-.snapshot-kv { display: grid; grid-template-columns: 110px minmax(0,1fr); gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--ui-border-subtle); font-size: 12px; }.snapshot-kv span { color: var(--ui-text-tertiary); }.snapshot-kv strong { font-weight: 500; overflow-wrap: anywhere; }
-.mono { font-family: var(--ui-font-mono); font-size: 11px; }.inspector-divider { height: 1px; background: var(--ui-border); margin: 14px 0; }
-.runtime-sequence { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; margin-top: 8px; font-size: 11px; color: var(--ui-text-secondary); }.runtime-sequence .el-icon { color: var(--ui-text-tertiary); }
-.snapshot-note, .submit-note { margin-top: 14px; padding: 10px; background: var(--ui-surface-muted); border: 1px solid var(--ui-border-subtle); border-radius: 4px; color: var(--ui-text-secondary); font-size: 11px; line-height: 1.5; display: flex; gap: 6px; }
-.inspector-empty { color: var(--ui-text-tertiary); font-size: 12px; padding: 40px 10px; text-align: center; }
-.bottom-actions { position: fixed; left: 220px; right: 0; bottom: 0; min-height: 56px; padding: 10px 28px; background: var(--ui-surface); border-top: 1px solid var(--ui-border); display: flex; align-items: center; justify-content: flex-end; gap: 8px; z-index: 3; }
-.context-header { min-height: 62px; background: var(--ui-surface); border-bottom: 1px solid var(--ui-border); display: flex; justify-content: space-between; align-items: center; padding: 9px 20px; position: sticky; top: 0; z-index: 4; }
-.context-left, .context-line, .context-actions { display: flex; align-items: center; }.context-left { gap: 10px; }.context-line { gap: 8px; font-size: 13px; }.context-label { color: var(--ui-text-tertiary); font-size: 11px; }.context-sub { color: var(--ui-text-tertiary); font-family: var(--ui-font-mono); font-size: 10px; margin-top: 3px; }.context-actions { gap: 8px; }
-.back-button { width: 28px; height: 28px; border: 1px solid var(--ui-border); border-radius: 4px; background: var(--ui-surface); color: var(--ui-text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; }.readonly-state { display: inline-flex; gap: 3px; align-items: center; color: var(--ui-text-tertiary); font-size: 10px; }
-.wizard-layout { display: grid; grid-template-columns: 220px minmax(0,1fr); min-height: calc(100vh - 110px); }.wizard-steps { background: var(--ui-surface); border-right: 1px solid var(--ui-border); padding: 16px 0; }.steps-title { padding: 0 16px 10px; font-size: 12px; font-weight: 600; }
-.wizard-step { width: 100%; border: 0; border-left: 2px solid transparent; background: transparent; padding: 9px 14px; display: grid; grid-template-columns: 24px minmax(0,1fr); gap: 8px; text-align: left; cursor: pointer; color: var(--ui-text); }.wizard-step.active { background: var(--ui-selected-bg); border-left-color: var(--ui-brand); }.wizard-step.done .step-index { color: var(--ui-success); }.wizard-step strong { display: block; font-size: 12px; font-weight: 500; }.wizard-step small { display: block; color: var(--ui-text-tertiary); font-size: 9px; font-family: var(--ui-font-mono); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.step-index { width: 20px; height: 20px; border: 1px solid var(--ui-border); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; color: var(--ui-text-tertiary); }.steps-note { margin: 14px; padding: 10px; border-top: 1px solid var(--ui-border-subtle); color: var(--ui-text-tertiary); font-size: 10px; line-height: 1.5; }
-.wizard-main { min-width: 0; padding: 24px 28px 80px; }.wizard-section { max-width: 980px; margin: 0 auto; }.section-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }.section-head h2 { margin: 0; font-size: 18px; }.section-head p { margin: 4px 0 0; color: var(--ui-text-secondary); font-size: 12px; }.mono-inline { font-family: var(--ui-font-mono); color: var(--ui-text-secondary); }
-.schema-form { max-width: 760px; padding: 18px 20px; background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: var(--ui-radius-panel); }.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }.span-2 { grid-column: span 2; }
-.mono-sub { font-family: var(--ui-font-mono); font-size: 10px; color: var(--ui-text-tertiary); margin-top: 2px; }.table-help { margin-top: 8px; color: var(--ui-text-tertiary); font-size: 11px; }
-.confirm-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); border: 1px solid var(--ui-border); border-radius: var(--ui-radius-panel); background: var(--ui-surface); overflow: hidden; }.confirm-block { padding: 14px; border-right: 1px solid var(--ui-border-subtle); display: flex; flex-direction: column; gap: 4px; }.confirm-block:last-child { border-right: 0; }.confirm-block > span { color: var(--ui-text-tertiary); font-size: 11px; }.confirm-block strong { font-size: 12px; font-weight: 500; }.confirm-block small { color: var(--ui-text-tertiary); font-size: 10px; }
-.process-preview { margin-top: 14px; background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: var(--ui-radius-panel); padding: 14px; }.preview-title { font-size: 12px; font-weight: 600; margin-bottom: 12px; }.process-nodes { display: flex; align-items: center; gap: 7px; overflow-x: auto; }.process-node { min-width: 120px; border: 1px solid var(--ui-border); border-radius: 4px; padding: 9px; display: flex; flex-direction: column; gap: 3px; }.process-node span { color: var(--ui-text-tertiary); font-size: 9px; }.process-node strong { font-size: 11px; font-weight: 500; }.process-nodes > .el-icon { color: var(--ui-text-tertiary); flex: 0 0 auto; }
-.wizard-actions { position: fixed; left: 440px; right: 0; bottom: 0; min-height: 56px; background: var(--ui-surface); border-top: 1px solid var(--ui-border); padding: 10px 28px; display: flex; justify-content: flex-end; gap: 8px; z-index: 3; }
-@media (max-width: 1180px) { .catalog-layout { grid-template-columns: 1fr; }.scenario-inspector { position: static; }.scenario-grid { grid-template-columns: 28px minmax(180px,1.5fr) 80px 100px 90px 1fr; }.scenario-grid > :last-child { display:none; }.confirm-grid { grid-template-columns: 1fr 1fr; }.confirm-block:nth-child(2) { border-right:0; }.wizard-actions { left: 440px; } }
+.composer-shell {color:var(--ui-text);min-width:0;min-height:100%;}.scenario-select-page {padding:24px 32px;}.page-header {margin-bottom:20px;}.page-header h1 {font-size:24px;font-weight:600;margin:0;}.page-header p {font-size:13px;color:var(--ui-text-secondary);margin:6px 0 0;}.catalog-layout {display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:16px;align-items:start;}.catalog-main,.scenario-inspector,.saved-drafts {background:var(--ui-surface);border:1px solid var(--ui-border);border-radius:6px;min-width:0;}.filter-bar {padding:12px;display:flex;gap:8px;border-bottom:1px solid var(--ui-border);flex-wrap:wrap;}.filter-bar .el-input {flex:1;min-width:160px;}.filter-bar .el-select {width:130px;}.scenario-grid {display:grid;grid-template-columns:24px minmax(150px,1fr) 76px 90px 75px;gap:8px;align-items:center;}.scenario-header {padding:10px 12px;font-size:12px;color:var(--ui-text-secondary);background:var(--ui-surface-muted);}.scenario-row {width:100%;padding:12px;border:0;border-top:1px solid var(--ui-border-subtle);background:var(--ui-surface);text-align:left;font:inherit;font-size:12px;color:var(--ui-text-secondary);cursor:pointer;}.scenario-row.selected {background:var(--ui-selected-bg);}.scenario-row:hover {background:var(--ui-surface-muted);}.scene-identity {min-width:0;}.scene-identity strong {display:block;color:var(--ui-text);font-size:14px;font-weight:500;}.scene-identity small {display:block;font-size:11px;overflow-wrap:anywhere;margin-top:3px;}.radio-mark {width:16px;height:16px;border:1px solid var(--ui-border-control);border-radius:50%;display:flex;align-items:center;justify-content:center;}.radio-mark span {width:8px;height:8px;border-radius:50%;background:var(--ui-brand);}.version-token,.reference-token {display:inline-block;border:1px solid var(--ui-border);border-radius:3px;background:var(--ui-surface-muted);padding:2px 6px;font-size:12px;color:var(--ui-text-secondary);overflow-wrap:anywhere;}.scenario-inspector {padding:16px;}.scenario-inspector h2 {font-size:16px;margin:0 0 6px;}.scenario-inspector h3 {font-size:14px;}.scenario-inspector dt {font-size:12px;color:var(--ui-text-secondary);margin-top:12px;}.scenario-inspector dd {font-size:13px;margin:4px 0 0;overflow-wrap:anywhere;}.mono {font-family:var(--ui-font-mono);font-size:12px;overflow-wrap:anywhere;}.runtime-sequence {display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--ui-text-secondary);}.snapshot-note,.submit-note {font-size:12px;color:var(--ui-text-secondary);line-height:1.6;}.bottom-actions {padding:16px 0;display:flex;gap:8px;justify-content:flex-end;}.saved-drafts {padding:12px 16px;margin-bottom:16px;}.saved-drafts h2 {font-size:14px;margin:0 0 8px;}.saved-drafts h2 span {font-weight:400;color:var(--ui-text-secondary);}.draft-row {display:flex;justify-content:space-between;gap:12px;align-items:center;padding:8px 0;border-top:1px solid var(--ui-border-subtle);}.draft-row>div {min-width:0;}.draft-row strong {display:block;font-size:13px;overflow-wrap:anywhere;}.draft-row small {display:block;font-size:12px;color:var(--ui-text-secondary);}
+.context-header {background:var(--ui-surface);border-bottom:1px solid var(--ui-border);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}.context-left,.context-line,.context-actions {display:flex;align-items:center;gap:8px;min-width:0;}.context-line,.context-actions {flex-wrap:wrap;}.context-left>div {min-width:0;}.context-line>span:last-child,.save-state {color:var(--ui-text-secondary);font-size:12px;}.context-sub {font-size:12px;color:var(--ui-text-secondary);margin-top:4px;overflow-wrap:anywhere;}.back-button {display:flex;align-items:center;justify-content:center;width:32px;height:32px;flex-shrink:0;border:1px solid var(--ui-border);border-radius:4px;background:var(--ui-surface);color:var(--ui-text-secondary);cursor:pointer;}.wizard-layout {display:grid;grid-template-columns:220px minmax(0,1fr);}.wizard-steps {background:var(--ui-surface);border-right:1px solid var(--ui-border);padding:16px 0;}.steps-title {font-size:14px;font-weight:600;padding:0 16px 12px;}.wizard-step {display:grid;grid-template-columns:24px minmax(0,1fr);gap:8px;width:100%;border:0;border-left:2px solid transparent;background:transparent;padding:12px 14px;text-align:left;font:inherit;cursor:pointer;color:var(--ui-text);}.wizard-step.active {background:var(--ui-selected-bg);border-left-color:var(--ui-brand);}.wizard-step strong {display:block;font-size:14px;font-weight:500;}.wizard-step small {display:block;font-size:11px;color:var(--ui-text-secondary);overflow-wrap:anywhere;margin-top:4px;}.step-index {width:22px;height:22px;border:1px solid var(--ui-border);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;}.steps-note {padding:0 16px;font-size:12px;line-height:1.6;color:var(--ui-text-secondary);}.wizard-main {padding:24px;min-width:0;}.wizard-section {min-width:0;}.section-head {display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:16px;flex-wrap:wrap;}.section-head h2 {font-size:18px;font-weight:600;margin:0;}.section-head p {font-size:13px;color:var(--ui-text-secondary);margin:6px 0 0;}.schema-form {background:var(--ui-surface);border:1px solid var(--ui-border);border-radius:6px;padding:20px;}.table-container {overflow-x:auto;max-width:100%;}.table-help {font-size:12px;color:var(--ui-text-secondary);}.confirm-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));background:var(--ui-surface);border:1px solid var(--ui-border);border-radius:6px;}.confirm-block {display:flex;flex-direction:column;gap:6px;padding:16px;overflow-wrap:anywhere;border-bottom:1px solid var(--ui-border-subtle);}.confirm-block>span,.confirm-block small {font-size:12px;color:var(--ui-text-secondary);}.confirm-block strong {font-size:14px;font-weight:500;}.process-preview {background:var(--ui-surface);border:1px solid var(--ui-border);border-radius:6px;padding:16px;margin-top:16px;}.process-preview h3 {font-size:14px;margin:0 0 12px;}.process-nodes {display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;}.process-node {min-width:110px;display:flex;flex-direction:column;gap:4px;padding:10px;border:1px solid var(--ui-border);border-radius:4px;}.process-node span {font-size:12px;color:var(--ui-text-secondary);}.process-node strong {font-size:13px;font-weight:500;}.wizard-actions {display:flex;justify-content:flex-end;gap:8px;margin-top:20px;padding:12px;background:var(--ui-surface);border-top:1px solid var(--ui-border);position:sticky;bottom:0;z-index:2;}.composer-shell :deep(.el-button+.el-button) {margin-left:0;}.runtime-error,.validation-list {padding:12px 16px;border:1px solid var(--ui-danger);background:var(--ui-danger-bg);color:var(--ui-danger);font-size:13px;border-radius:4px;margin:16px;}.validation-list {margin:0 0 16px;}.validation-list strong {display:block;margin-bottom:6px;}.field-error {font-size:12px;color:var(--ui-danger);display:block;}
+@media(max-width:1300px){.catalog-layout {grid-template-columns:minmax(0,1fr);}}@media(max-width:767px){.scenario-select-page {padding:16px;}.catalog-layout {grid-template-columns:minmax(0,1fr);}.scenario-header {display:none;}.scenario-row {grid-template-columns:24px minmax(0,1fr);}.scenario-row>:nth-child(n+3) {grid-column:2;}.context-header {padding:16px;}.wizard-layout {grid-template-columns:minmax(0,1fr);}.wizard-steps {display:flex;overflow-x:auto;padding:8px 0;}.wizard-step {flex:0 0 180px;width:180px;}.steps-title,.steps-note {display:none;}.wizard-main {padding:16px;}.confirm-grid {grid-template-columns:minmax(0,1fr);}.filter-bar .el-input,.filter-bar .el-select {width:100%;max-width:100%;}}
 </style>

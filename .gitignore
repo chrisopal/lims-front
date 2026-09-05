@@ -18,3 +18,8 @@ logs/
 # beside it.
 /.plugins/
 /.opencode-skills/
+
+# Reproducible local/CI validation outputs
+.qa-domain/
+.qa-tools/
+qa-artifacts/
