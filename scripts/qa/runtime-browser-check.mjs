@@ -3,6 +3,7 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import {pathToFileURL} from 'node:url';
 import {demoScenarios} from '../../.qa-domain/scenarios.js';
+import {chooseOption,setCheckbox} from './element-controls.mjs';
 const {chromium}=await import(pathToFileURL(path.resolve(process.env.QA_TOOL_ROOT||'.qa-tools','node_modules/playwright/index.mjs')).href);
 const base=process.env.QA_BASE_URL||'http://127.0.0.1:4173';const out=process.env.QA_OUTPUT||'qa-artifacts';const key='lims.demo.runtime.v1';
 await fs.mkdir(path.join(out,'screenshots'),{recursive:true});const browser=await chromium.launch();const results=[];
@@ -19,15 +20,12 @@ async function run(name,width,fn){
  async function fillFields(fields,prefix='request',target=page){
    for(const field of fields){
      const input=target.locator(`#${prefix}-${field.key}`);
-     if(field.type==='select'){
-       // Click the component's interactive wrapper, not the readonly input covered by its placeholder.
-       await target.locator(`.el-select:has(#${prefix}-${field.key}) .el-select__wrapper`).click();
-       await target.getByRole('option',{name:field.options[0],exact:true}).click();
-     }else await input.fill(field.type==='date'?'2026-09-10':field.key==='value'?'20.005':`演示-${field.key}`);
+     if(field.type==='select') await chooseOption(target,target.locator(`.el-select:has(#${prefix}-${field.key})`),field.options[0]);
+     else await input.fill(field.type==='date'?'2026-09-10':field.key==='value'?'20.005':`演示-${field.key}`);
    }
    await target.locator('.section-head h2, .runtime-header h1').first().click();
  }
- async function fillSubjects(scene){const row=page.locator('.wizard-main .el-table__body-wrapper tbody tr').first();for(const f of scene.subjectFields){if(f.type==='select'){await row.locator('.el-select__wrapper').click();await page.getByRole('option',{name:f.options[0],exact:true}).click()}else await row.getByRole('textbox',{name:f.label,exact:true}).fill(f.key==='quantity'?'1':`DEMO-${f.key}`)}}
+ async function fillSubjects(scene){const row=page.locator('.wizard-main .el-table__body-wrapper tbody tr').first();for(const f of scene.subjectFields){if(f.type==='select')await chooseOption(page,row.locator('.el-select'),f.options[0]);else await row.getByRole('textbox',{name:f.label,exact:true}).fill(f.key==='quantity'?'1':`DEMO-${f.key}`)}}
  async function ready(index=0){const scene=demoScenarios[index];await start(index);await fillFields(scene.requestFields);await next();await fillSubjects(scene);await next();return scene}
  async function fits(selector){const r=await page.locator(selector).boundingBox();assert(r&&r.width>=Math.min(300,width-32)&&r.x>=-2&&r.x+r.width<=width+2,`${selector}: ${JSON.stringify(r)}`);assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+2),'page overflow')}
  try{await fn({page,context,goto,shot,read,next,start,fillFields,fillSubjects,ready,fits});assert.equal(errors.length,0,errors.join('\n'));entry.passed=true}catch(e){entry.error=e.message;await shot('failure').catch(()=>{})}
@@ -37,14 +35,16 @@ for(const width of [1440,390]){
  for(const index of [0,1,2])await run(`sequence-${index}`,width,async({page,shot,read,next,ready,fillFields,fits})=>{
    const scene=await ready(index);await next();await page.getByRole('button',{name:'提交并创建本地工作项',exact:true}).click();await page.waitForURL('**/#/app/operations/my-work?requestId=*');
    let data=await read();assert.equal(data.requests.length,1);assert.equal(data.workItems.length,1);const bound=JSON.stringify(data.requests[0].snapshot);assert.equal(data.requests[0].snapshot.version,scene.version);
+   await shot('my-work');
    await page.getByRole('button',{name:'打开工作台',exact:true}).first().click();await page.locator('.record-panel').waitFor({state:'visible'});
    for(let n=0;n<scene.nodes.length;n++){
      await page.getByRole('button',{name:'开始处理',exact:true}).click();await page.locator('.record-panel input, .record-panel textarea').first().waitFor({state:'visible'});
      await fillFields(scene.nodes[n].fields,'record');
-     if(scene.nodes[n].requiresConfirmation){await page.getByRole('button',{name:'完成当前节点（演示）',exact:true}).click();assert.match(await page.locator('.record-errors').innerText(),/请确认/);await page.getByRole('checkbox').check()}
-     if(n===0){await page.getByRole('button',{name:'保存节点记录',exact:true}).click();await page.waitForFunction(k=>JSON.parse(localStorage.getItem(k)).workItems[0].revision===2,key);await page.reload({waitUntil:'networkidle'});const input=page.locator(`#record-${scene.nodes[0].fields[0].key}`);assert((await input.inputValue()).length>0);await fits('.runtime-main');await shot('record-saved')}
+     if(scene.nodes[n].requiresConfirmation){await page.getByRole('button',{name:'完成当前节点（演示）',exact:true}).click();assert.match(await page.locator('.record-errors').innerText(),/请确认/);await setCheckbox(page.locator('.record-panel label.el-checkbox'),true)}
+     if(n===0){await page.getByRole('button',{name:'保存节点记录',exact:true}).click();await page.waitForFunction(k=>JSON.parse(localStorage.getItem(k)).workItems[0].revision===2,key);assert.equal(await page.locator('.runtime-workbench > .el-alert--error').count(),0,'Own save must not raise a conflict');await page.reload({waitUntil:'networkidle'});const input=page.locator(`#record-${scene.nodes[0].fields[0].key}`);assert((await input.inputValue()).length>0);await fits('.runtime-main');await shot('record-saved')}
+     if(['sampling','measurement'].includes(scene.nodes[n].renderer)){await fits('.runtime-main');await shot(scene.nodes[n].renderer)}
      await page.getByRole('button',{name:'完成当前节点（演示）',exact:true}).click();await page.waitForFunction(({k,n})=>JSON.parse(localStorage.getItem(k)).workItems[n].status==='COMPLETED',{k:key,n});
-     data=await read();assert.equal(data.workItems.length,Math.min(scene.nodes.length,n+2));assert.equal(JSON.stringify(data.requests[0].snapshot),bound);
+     data=await read();assert.equal(data.workItems.length,Math.min(scene.nodes.length,n+2));assert.equal(JSON.stringify(data.requests[0].snapshot),bound);assert.equal(await page.locator('.runtime-workbench > .el-alert--error').count(),0);
      if(n<scene.nodes.length-1){await page.getByRole('button',{name:'打开下一工作项',exact:true}).click();await page.getByRole('button',{name:'开始处理',exact:true}).waitFor({state:'visible'})}
    }
    data=await read();assert.equal(data.requests[0].status,'COMPLETED');assert(data.workItems.every(w=>w.status==='COMPLETED'));assert.equal(await page.getByRole('button',{name:'保存节点记录',exact:true}).count(),0);await shot('completed');
@@ -53,8 +53,8 @@ for(const width of [1440,390]){
    const scene=demoScenarios[0];await start();await next();assert.match(await page.locator('.validation-list').innerText(),/请填写/);assert.equal(await page.locator('#request-customer').count(),1);
    await fillFields(scene.requestFields);await next();await fillSubjects(scene);await next();
    assert.equal(await page.locator('.el-table__body-wrapper input[type="checkbox"]:checked').count(),3);
-   await page.locator('.el-table__header-wrapper input[type="checkbox"]').uncheck();await next();assert.match(await page.locator('.validation-list').innerText(),/至少选择一个检测项/);
-   await page.locator('.el-table__body-wrapper input[type="checkbox"]').first().check();await page.getByRole('button',{name:'保存草稿',exact:true}).click();await page.waitForFunction(k=>JSON.parse(localStorage.getItem(k)).drafts[0].revision===1,key);
+   await setCheckbox(page.locator('.el-table__header-wrapper label.el-checkbox'),false);await next();assert.match(await page.locator('.validation-list').innerText(),/至少选择一个检测项/);
+   await setCheckbox(page.locator('.el-table__body-wrapper label.el-checkbox').first(),true);await page.getByRole('button',{name:'保存草稿',exact:true}).click();await page.waitForFunction(k=>JSON.parse(localStorage.getItem(k)).drafts[0].revision===1,key);
    const id=(await read()).drafts[0].id;await page.reload({waitUntil:'networkidle'});assert.equal(await page.locator('#request-customer').inputValue(),'演示-customer');await next();await next();assert.equal(await page.locator('.el-table__body-wrapper input[type="checkbox"]:checked').count(),1);
    await next();assert.match(await page.locator('.confirm-grid').innerText(),/1 项/);await shot('one-item');await page.getByRole('button',{name:'提交并创建本地工作项',exact:true}).click();await page.waitForURL('**/my-work?requestId=*');
    const s=await read();assert.equal(s.requests[0].itemCodes.length,1);await goto(`/app/operations/requests?draftId=${id}`);await page.waitForURL('**/my-work?requestId=*');assert.equal((await read()).requests.length,1);

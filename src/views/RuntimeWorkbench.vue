@@ -58,8 +58,9 @@ const dirty=computed(()=>!!loadedId.value&&signature()!==savedSignature.value);
 const nodeWork=(index:number)=>state.value.workItems.find(w=>w.requestId===request.value?.id&&w.nodeIndex===index);
 const nextWork=computed(()=>work.value?nodeWork(work.value.nodeIndex+1):undefined);
 const events=computed(()=>state.value.events.filter(e=>e.targetId===request.value?.id||state.value.workItems.some(w=>w.requestId===request.value?.id&&w.id===e.targetId)).slice().reverse());
-function apply(w:WorkItem){values.value=clone(w.values);confirmed.value=w.confirmed;revision.value=w.revision;loadedId.value=w.id;savedSignature.value=signature();issues.value=[]}
-watch(work,w=>{if(!w)return;if(loadedId.value!==w.id||!dirty.value)apply(clone(w));else if(w.revision!==revision.value)actionError.value='工作项已更新；当前未保存输入被保留，请确认后刷新。'},{immediate:true});
+function apply(w:WorkItem){values.value=clone(w.values);confirmed.value=w.confirmed;revision.value=w.revision;loadedId.value=w.id;savedSignature.value=signature();issues.value=[];actionError.value=''}
+// Own writes are applied from their returned revision. Treat only outside writes as conflicts.
+watch(work,w=>{if(!w||busy.value)return;if(loadedId.value!==w.id||!dirty.value)apply(clone(w));else if(w.revision!==revision.value)actionError.value='工作项已更新；当前未保存输入被保留，请确认后刷新。'},{immediate:true});
 async function perform(fn:()=>Promise<void>){if(busy.value)return;busy.value=true;actionError.value='';try{await fn()}catch(e){actionError.value=e instanceof Error?e.message:'操作失败'}finally{busy.value=false}}
 async function start(){if(work.value)await perform(async()=>apply(await repository.startWork(work.value!.id,revision.value)))}
 async function save(complete:boolean){

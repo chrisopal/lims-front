@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
+import { chooseOption } from './element-controls.mjs';
 const { chromium } = await import(pathToFileURL(path.resolve(process.env.QA_TOOL_ROOT || '.qa-tools', 'node_modules/playwright/index.mjs')).href);
 const base = process.env.QA_BASE_URL || 'http://127.0.0.1:4173';
 const out = process.env.QA_OUTPUT || 'qa-artifacts';
@@ -66,8 +67,7 @@ for (const width of [1440, 390]) {
     assert.match(await page.locator('.context-header').innerText(), /v1\.2\.0/);
     await page.locator('#request-customer').fill('视觉回归演示委托方');
     await page.locator('#request-contact').fill('演示联系人');
-    await page.locator('.el-select:has(#request-purpose) .el-select__wrapper').click();
-    await page.getByRole('option', {name:'合规检测',exact:true}).click();
+    await chooseOption(page, page.locator('.el-select:has(#request-purpose)'), '合规检测');
     await page.locator('#request-dueDate').fill('2026-09-10');
     await page.locator('.section-head h2').click();
     await shot('basic');
@@ -76,8 +76,7 @@ for (const width of [1440, 390]) {
     assert.equal(await page.locator('.wizard-main .el-table__body-wrapper tbody tr').count(), 2);
     for (const row of await page.locator('.wizard-main .el-table__body-wrapper tbody tr').all()) {
       await row.getByRole('textbox', {name:'样品名称',exact:true}).fill('演示样品');
-      await row.locator('.el-select__wrapper').click();
-      await page.getByRole('option', {name:'粮食及制品',exact:true}).click();
+      await chooseOption(page, row.locator('.el-select'), '粮食及制品');
       await row.getByRole('textbox', {name:'批次 / Lot',exact:true}).fill('DEMO-LOT');
       await row.getByRole('textbox', {name:'数量',exact:true}).fill('1');
     }
