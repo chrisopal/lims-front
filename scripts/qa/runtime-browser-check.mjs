@@ -16,8 +16,18 @@ async function run(name,width,fn){
  const read=()=>page.evaluate(k=>JSON.parse(localStorage.getItem(k)),key);
  const next=()=>page.locator('.wizard-actions').getByRole('button',{name:'下一步',exact:true}).click();
  async function start(index=0){await goto('/app/operations/requests');await page.locator('button.scenario-row').nth(index).click();await page.getByRole('button',{name:'使用此场景',exact:true}).click();await page.locator('.wizard-main').waitFor({state:'visible'})}
- async function fillFields(fields,prefix='request',target=page){for(const field of fields){const input=target.locator(`#${prefix}-${field.key}`);if(field.type==='select'){await input.click();await target.getByRole('option',{name:field.options[0],exact:true}).click()}else{await input.fill(field.type==='date'?'2026-09-10':field.key==='value'?'20.005':`演示-${field.key}`)}}await target.locator('h1').first().click()}
- async function fillSubjects(scene){const row=page.locator('.wizard-main .el-table__body-wrapper tbody tr').first();for(const f of scene.subjectFields){if(f.type==='select'){await row.locator('.el-select').click();await page.getByRole('option',{name:f.options[0],exact:true}).click()}else await row.getByRole('textbox',{name:f.label,exact:true}).fill(f.key==='quantity'?'1':`DEMO-${f.key}`)}}
+ async function fillFields(fields,prefix='request',target=page){
+   for(const field of fields){
+     const input=target.locator(`#${prefix}-${field.key}`);
+     if(field.type==='select'){
+       // Click the component's interactive wrapper, not the readonly input covered by its placeholder.
+       await target.locator(`.el-select:has(#${prefix}-${field.key}) .el-select__wrapper`).click();
+       await target.getByRole('option',{name:field.options[0],exact:true}).click();
+     }else await input.fill(field.type==='date'?'2026-09-10':field.key==='value'?'20.005':`演示-${field.key}`);
+   }
+   await target.locator('.section-head h2, .runtime-header h1').first().click();
+ }
+ async function fillSubjects(scene){const row=page.locator('.wizard-main .el-table__body-wrapper tbody tr').first();for(const f of scene.subjectFields){if(f.type==='select'){await row.locator('.el-select__wrapper').click();await page.getByRole('option',{name:f.options[0],exact:true}).click()}else await row.getByRole('textbox',{name:f.label,exact:true}).fill(f.key==='quantity'?'1':`DEMO-${f.key}`)}}
  async function ready(index=0){const scene=demoScenarios[index];await start(index);await fillFields(scene.requestFields);await next();await fillSubjects(scene);await next();return scene}
  async function fits(selector){const r=await page.locator(selector).boundingBox();assert(r&&r.width>=Math.min(300,width-32)&&r.x>=-2&&r.x+r.width<=width+2,`${selector}: ${JSON.stringify(r)}`);assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+2),'page overflow')}
  try{await fn({page,context,goto,shot,read,next,start,fillFields,fillSubjects,ready,fits});assert.equal(errors.length,0,errors.join('\n'));entry.passed=true}catch(e){entry.error=e.message;await shot('failure').catch(()=>{})}

@@ -22,7 +22,6 @@ for (const width of [1440, 390]) {
     const fits = async selector => {
       const el = page.locator(selector).first();
       await el.waitFor({ state: 'visible' });
-      // Wait for drawer animation to settle; keep actual geometry bounds strict.
       await page.waitForFunction(sel => {
         const element = document.querySelector(sel);
         if (!element) return false;
@@ -65,10 +64,9 @@ for (const width of [1440, 390]) {
     await page.getByRole('button', { name: '使用此场景', exact: true }).click();
     await fits('.wizard-main');
     assert.match(await page.locator('.context-header').innerText(), /v1\.2\.0/);
-    // Required fields are now real validation gates rather than visual asterisks.
     await page.locator('#request-customer').fill('视觉回归演示委托方');
     await page.locator('#request-contact').fill('演示联系人');
-    await page.locator('#request-purpose').click();
+    await page.locator('.el-select:has(#request-purpose) .el-select__wrapper').click();
     await page.getByRole('option', {name:'合规检测',exact:true}).click();
     await page.locator('#request-dueDate').fill('2026-09-10');
     await page.locator('.section-head h2').click();
@@ -78,7 +76,7 @@ for (const width of [1440, 390]) {
     assert.equal(await page.locator('.wizard-main .el-table__body-wrapper tbody tr').count(), 2);
     for (const row of await page.locator('.wizard-main .el-table__body-wrapper tbody tr').all()) {
       await row.getByRole('textbox', {name:'样品名称',exact:true}).fill('演示样品');
-      await row.locator('.el-select').click();
+      await row.locator('.el-select__wrapper').click();
       await page.getByRole('option', {name:'粮食及制品',exact:true}).click();
       await row.getByRole('textbox', {name:'批次 / Lot',exact:true}).fill('DEMO-LOT');
       await row.getByRole('textbox', {name:'数量',exact:true}).fill('1');
