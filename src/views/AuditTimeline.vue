@@ -1,152 +1,452 @@
 <template>
   <div class="page">
-    <div class="page-header">
+    <header class="page-header">
       <div>
-        <div class="page-title">审计 · 流程时间线</div>
-        <div class="page-subtitle">Audit Trail · 完整过程追溯</div>
+        <h1>审计 · 流程时间线</h1>
+        <p>当前浏览器运行时的操作记录，便于演示追溯。</p>
       </div>
-      <el-button size="small">导出审计记录</el-button>
-    </div>
-
-    <!-- Selector -->
+      <el-button size="small" :disabled="!selectedRequest" @click="download"
+        >导出审计记录</el-button
+      >
+    </header>
+    <LocalDemoNotice /><el-alert
+      v-if="error"
+      :title="error"
+      type="error"
+      :closable="false"
+      show-icon
+    />
     <div class="selector-bar">
-      <span class="selector-label">委托 / 申请：</span>
-      <el-select value="REQ-20260901-009" style="width:220px" size="small">
-        <el-option label="REQ-20260901-009" value="REQ-20260901-009" />
-        <el-option label="REQ-20260905-004" value="REQ-20260905-004" />
-        <el-option label="REQ-20260903-018" value="REQ-20260903-018" />
-      </el-select>
-      <span class="selector-label" style="margin-left:16px">场景快照：</span>
-      <span class="snapshot-tag">第三方食品理化检测 v1.2.0 · sha256:7fa3c2d...</span>
+      <span class="selector-label">委托 / 申请：</span
+      ><el-select
+        v-model="selectedId"
+        placeholder="选择委托"
+        size="small"
+        style="width: 260px"
+        ><el-option
+          v-for="request in state.requests"
+          :key="request.id"
+          :label="`${request.number} · ${request.snapshot.name}`"
+          :value="request.id" /></el-select
+      ><span v-if="selectedRequest" class="snapshot-tag"
+        >{{ selectedRequest.snapshot.version }} ·
+        {{ selectedRequest.snapshot.snapshotRef }}</span
+      >
     </div>
-
-    <div class="audit-layout">
-      <!-- Timeline -->
-      <div class="timeline-wrap">
-        <div v-for="(event, i) in events" :key="event.id" class="tl-item">
+    <div v-if="selectedRequest" class="audit-layout">
+      <section class="timeline-wrap">
+        <div
+          v-if="events.length"
+          v-for="(event, i) in events"
+          :key="event.id"
+          class="tl-item"
+        >
           <div class="tl-left">
             <div :class="['tl-dot', event.type]"></div>
-            <div class="tl-line" v-if="i < events.length - 1"></div>
+            <div v-if="i < events.length - 1" class="tl-line"></div>
           </div>
           <div class="tl-content">
             <div class="tl-header">
-              <span class="tl-event">{{ event.event }}</span>
-              <span :class="['tl-type-tag', event.type]">{{ event.typeLabel }}</span>
+              <span class="tl-event">{{ event.action }}</span
+              ><span :class="['tl-type-tag', event.type]">{{
+                event.typeLabel
+              }}</span>
             </div>
             <div class="tl-meta">
-              <span class="tl-time">{{ event.time }}</span>
-              <span class="tl-sep">·</span>
-              <span class="tl-actor">{{ event.actor }}</span>
-              <span class="tl-sep">·</span>
-              <span class="tl-node">{{ event.node }}</span>
+              <span>{{ format(event.at) }}</span
+              ><span class="tl-sep">·</span><span>{{ event.targetLabel }}</span>
             </div>
-            <div class="tl-detail" v-if="event.detail">{{ event.detail }}</div>
+            <div class="tl-detail">{{ event.message }}</div>
             <div class="tl-trace">
-              <span class="trace-label">Trace ID</span>
-              <span class="trace-val">{{ event.traceId }}</span>
-              <el-icon size="11" style="cursor:pointer;color:#B0B9C6" title="复制"><CopyDocument /></el-icon>
-            </div>
-            <div class="tl-snapshot" v-if="event.snapshot">
-              <span class="snap-label">Snapshot</span>
-              <span class="snap-val">{{ event.snapshot }}</span>
+              <span class="trace-label">记录 ID</span
+              ><span class="trace-val">{{ event.id }}</span>
             </div>
           </div>
         </div>
-      </div>
-
-      <!-- Summary stats -->
-      <div class="audit-summary">
+        <el-empty v-else description="该委托暂无操作记录" />
+      </section>
+      <aside class="audit-summary">
         <div class="summary-title">流程概要</div>
-        <div class="summary-kv"><span class="sk">委托号</span><span class="sv mono">REQ-20260901-009</span></div>
-        <div class="summary-kv"><span class="sk">场景</span><span class="sv">第三方食品理化检测</span></div>
-        <div class="summary-kv"><span class="sk">版本快照</span><span class="sv mono small">v1.2.0 · sha256:7fa...</span></div>
-        <div class="summary-kv"><span class="sk">创建时间</span><span class="sv">2026-09-01 09:12</span></div>
-        <div class="summary-kv"><span class="sk">完成时间</span><span class="sv">2026-09-05 16:44</span></div>
-        <div class="summary-kv"><span class="sk">总耗时</span><span class="sv">4d 7h 32m</span></div>
-        <div class="summary-kv"><span class="sk">涉及人员</span><span class="sv">5 人</span></div>
-        <el-divider />
-        <div class="summary-title">AI 决策记录</div>
-        <div v-for="ai in aiDecisions" :key="ai.id" class="ai-decision-row">
-          <el-icon size="12" color="#526075"><MagicStick /></el-icon>
-          <div>
-            <div class="ai-skill">{{ ai.skill }}</div>
-            <div class="ai-outcome">{{ ai.outcome }}</div>
-          </div>
+        <div class="summary-kv">
+          <span class="sk">委托号</span
+          ><span class="sv mono">{{ selectedRequest.number }}</span>
         </div>
-      </div>
+        <div class="summary-kv">
+          <span class="sk">场景</span
+          ><span class="sv">{{ selectedRequest.snapshot.name }}</span>
+        </div>
+        <div class="summary-kv">
+          <span class="sk">版本快照</span
+          ><span class="sv mono small">{{
+            selectedRequest.snapshot.version
+          }}</span>
+        </div>
+        <div class="summary-kv">
+          <span class="sk">对象 / 检测项</span
+          ><span class="sv"
+            >{{ selectedRequest.subjects.length }} /
+            {{ selectedRequest.itemCodes.length }}</span
+          >
+        </div>
+        <div class="summary-kv">
+          <span class="sk">当前状态</span
+          ><span class="sv"
+            ><RuntimeStatus :status="selectedRequest.status"
+          /></span>
+        </div>
+        <div class="summary-kv">
+          <span class="sk">记录数量</span
+          ><span class="sv">{{ events.length }}</span>
+        </div>
+      </aside>
     </div>
+    <el-empty v-else description="完成并提交委托后，这里会显示本地流程记录" />
+    <section class="configuration-log">
+      <header class="page-header">
+        <div>
+          <h2>配置操作记录</h2>
+          <p>场景发布、激活和业务资产维护的本地记录</p>
+        </div>
+        <el-button
+          :disabled="!configurationEvents.length"
+          @click="downloadJson('configuration-audit.json', configurationEvents)"
+          >导出配置记录</el-button
+        >
+      </header>
+      <el-table :data="configurationEvents" border
+        ><el-table-column
+          prop="at"
+          label="时间"
+          min-width="190" /><el-table-column
+          prop="action"
+          label="动作"
+          min-width="190" /><el-table-column
+          prop="message"
+          label="记录"
+          min-width="280" /></el-table
+      ><el-empty
+        v-if="!configurationEvents.length"
+        description="尚未发生配置变更"
+      />
+    </section>
   </div>
 </template>
 <script setup lang="ts">
-import { ref } from 'vue'
-const events = ref([
-  { id: 1, event: 'Request Created', time: '2026-09-01 09:12', actor: '王芳（受理员）', node: '委托受理', type: 'create', typeLabel: 'System', detail: '委托方：上海食品工业协会', traceId: 'tr-a1b2c3d4', snapshot: null },
-  { id: 2, event: 'Scenario Snapshot Locked', time: '2026-09-01 09:13', actor: 'System', node: 'System', type: 'system', typeLabel: 'System', detail: '快照 sha256:7fa3c2d... 已锁定，流程将按此版本执行', traceId: 'tr-a1b2c3d5', snapshot: 'v1.2.0 · sha256:7fa3c2d...' },
-  { id: 3, event: 'Process Started', time: '2026-09-01 09:13', actor: 'System', node: 'REQUEST_ACCEPTANCE', type: 'system', typeLabel: 'Process', detail: null, traceId: 'tr-b2c3d4e5', snapshot: null },
-  { id: 4, event: 'REQUEST_ACCEPTANCE Completed', time: '2026-09-01 10:05', actor: '王芳（受理员）', node: 'REQUEST_ACCEPTANCE', type: 'human', typeLabel: 'Human', detail: '已确认检测项 12 项，标准版本已审核', traceId: 'tr-c3d4e5f6', snapshot: null },
-  { id: 5, event: 'SAMPLE_RECEIPT Completed', time: '2026-09-01 15:30', actor: '刘强（收样员）', node: 'SAMPLE_RECEIPT', type: 'human', typeLabel: 'Human', detail: '样品 F010 已接收，编号已录入', traceId: 'tr-d4e5f6a7', snapshot: null },
-  { id: 6, event: 'AI standard-match v1.2 Invoked', time: '2026-09-01 10:02', actor: 'AI · standard-match v1.2', node: 'REQUEST_ACCEPTANCE', type: 'ai', typeLabel: 'AI', detail: '推荐 GB 5009.12-2023（已采纳）', traceId: 'tr-e5f6a7b8', snapshot: null },
-  { id: 7, event: 'LAB_TEST_EXECUTION Started', time: '2026-09-02 08:30', actor: '李明（理化检测员）', node: 'LAB_TEST_EXECUTION', type: 'human', typeLabel: 'Human', detail: null, traceId: 'tr-f6a7b8c9', snapshot: null },
-  { id: 8, event: 'LAB_TEST_EXECUTION Completed', time: '2026-09-04 16:20', actor: '李明（理化检测员）', node: 'LAB_TEST_EXECUTION', type: 'human', typeLabel: 'Human', detail: '全部 12 项检测结果已录入', traceId: 'tr-g7b8c9d0', snapshot: null },
-  { id: 9, event: 'AI report-review v1.4 Invoked', time: '2026-09-05 09:15', actor: 'AI · report-review v1.4', node: 'TECHNICAL_REVIEW', type: 'ai', typeLabel: 'AI', detail: '发现 1 个单位不一致问题（已标注，由审核员确认）', traceId: 'tr-h8c9d0e1', snapshot: null },
-  { id: 10, event: 'TECHNICAL_REVIEW Approved', time: '2026-09-05 14:22', actor: '陈技术（技术负责人）', node: 'TECHNICAL_REVIEW', type: 'review', typeLabel: 'Review', detail: 'AI 标注问题已核实并更正', traceId: 'tr-i9d0e1f2', snapshot: null },
-  { id: 11, event: 'Report Released', time: '2026-09-05 16:44', actor: '张授权（授权签字人）', node: 'REPORT_RELEASE', type: 'complete', typeLabel: 'Complete', detail: '报告号 RPT-20260905-009 已签发', traceId: 'tr-j0e1f2a3', snapshot: null },
-])
-
-const aiDecisions = ref([
-  { id: 1, skill: 'standard-match v1.2', outcome: '推荐 GB 5009.12-2023 · 已采纳' },
-  { id: 2, skill: 'report-draft v2.0', outcome: '生成报告草稿 · 已采纳' },
-  { id: 3, skill: 'report-review v1.4', outcome: '识别 1 个问题 · 已采纳并修正' },
-])
+import { computed, ref, watch } from 'vue'
+import { useScenarioRepository } from '@/composables/useScenarioRepository'
+import { useCatalog } from '@/composables/useCatalog'
+import { downloadJson } from '@/utils/download'
+const scenario = useScenarioRepository()
+const catalog = useCatalog()
+const configurationEvents = computed(() =>
+  [...scenario.state.value.events, ...catalog.state.value.events].sort((a, b) =>
+    b.at.localeCompare(a.at),
+  ),
+)
+import { useLocalRuntime } from '@/composables/useLocalRuntime'
+import type { LocalEvent } from '@/runtime/local-runtime'
+import LocalDemoNotice from '@/components/runtime/LocalDemoNotice.vue'
+import RuntimeStatus from '@/components/runtime/RuntimeStatus.vue'
+const { state, error } = useLocalRuntime()
+const selectedId = ref('')
+const selectedRequest = computed(
+  () =>
+    state.value.requests.find((r) => r.id === selectedId.value) ||
+    state.value.requests[0],
+)
+watch(
+  () => state.value.requests,
+  (requests) => {
+    if (!selectedId.value && requests[0]) selectedId.value = requests[0].id
+  },
+  { immediate: true },
+)
+const relatedIds = computed(
+  () =>
+    new Set(
+      state.value.workItems
+        .filter((w) => w.requestId === selectedRequest.value?.id)
+        .map((w) => w.id),
+    ),
+)
+const events = computed(() =>
+  state.value.events
+    .filter(
+      (e) =>
+        e.targetId === selectedRequest.value?.id ||
+        relatedIds.value.has(e.targetId),
+    )
+    .slice()
+    .sort((a, b) => a.at.localeCompare(b.at))
+    .map((event) => ({
+      ...event,
+      type: typeOf(event),
+      typeLabel: labelOf(event),
+      targetLabel: targetOf(event),
+    })),
+)
+function typeOf(e: LocalEvent) {
+  if (e.action.includes('REVIEW'))
+    return e.action.includes('RETURN') || e.action.includes('REJECT')
+      ? 'review'
+      : 'complete'
+  if (e.action.includes('REPORT')) return 'complete'
+  if (e.action.includes('WORK')) return 'human'
+  if (e.action.includes('REQUEST')) return 'create'
+  return 'system'
+}
+function labelOf(e: LocalEvent) {
+  return typeOf(e) === 'review'
+    ? '审核'
+    : typeOf(e) === 'complete'
+      ? '完成'
+      : typeOf(e) === 'human'
+        ? '操作'
+        : typeOf(e) === 'create'
+          ? '委托'
+          : '系统'
+}
+function targetOf(e: LocalEvent) {
+  const work = state.value.workItems.find((w) => w.id === e.targetId)
+  if (work && selectedRequest.value)
+    return (
+      selectedRequest.value.snapshot.nodes[work.nodeIndex]?.label || e.targetId
+    )
+  return e.targetId === selectedRequest.value?.id ? '委托' : e.targetId
+}
+function format(s: string) {
+  return new Date(s).toLocaleString('zh-CN')
+}
+function download() {
+  if (!selectedRequest.value) return
+  const body = events.value
+    .map((e) => `${format(e.at)}\t${e.action}\t${e.targetLabel}\t${e.message}`)
+    .join('\n')
+  const blob = new Blob(
+    [
+      `委托：${selectedRequest.value.number}\n场景：${selectedRequest.value.snapshot.name} ${selectedRequest.value.snapshot.version}\n\n${body}`,
+    ],
+    { type: 'text/plain;charset=utf-8' },
+  )
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${selectedRequest.value.number}-audit.txt`
+  a.click()
+  URL.revokeObjectURL(url)
+}
 </script>
 <style scoped>
-.page { padding: 24px 32px; }
-.page-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
-.page-title { font-size: 20px; font-weight: 600; color: #0B1220; }
-.page-subtitle { font-size: 12px; color: #526075; }
-.selector-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; padding: 10px 14px; background: #fff; border: 1px solid #D9DEE7; border-radius: 4px; font-size: 13px; }
-.selector-label { color: #526075; font-size: 12px; }
-.snapshot-tag { font-family: monospace; font-size: 11px; color: #18794E; background: #F0FFF4; border: 1px solid #B7E6CB; padding: 2px 8px; border-radius: 3px; }
-.audit-layout { display: flex; gap: 16px; }
-.timeline-wrap { flex: 1; background: #fff; border: 1px solid #D9DEE7; border-radius: 6px; padding: 20px 24px; }
-.tl-item { display: flex; gap: 0; }
-.tl-left { display: flex; flex-direction: column; align-items: center; width: 20px; flex-shrink: 0; margin-right: 16px; }
-.tl-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
-.tl-dot.create { background: #1677FF; }
-.tl-dot.system { background: #D9DEE7; }
-.tl-dot.human { background: #18794E; }
-.tl-dot.ai { background: #526075; }
-.tl-dot.review { background: #A9650A; }
-.tl-dot.complete { background: #1677FF; border: 2px solid #1677FF; }
-.tl-line { flex: 1; width: 1px; background: #E7EAF0; min-height: 20px; margin: 4px 0; }
-.tl-content { flex: 1; padding-bottom: 18px; }
-.tl-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-.tl-event { font-size: 13px; font-weight: 500; color: #0B1220; }
-.tl-type-tag { font-size: 10px; padding: 1px 5px; border-radius: 2px; }
-.tl-type-tag.system { background: #F5F7FA; color: #8A96A6; }
-.tl-type-tag.create, .tl-type-tag.complete { background: #EDF4FF; color: #1677FF; }
-.tl-type-tag.human { background: #F0FFF4; color: #18794E; }
-.tl-type-tag.ai { background: #F5F0FF; color: #526075; }
-.tl-type-tag.review { background: #FFF3E0; color: #A9650A; }
-.tl-meta { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #8A96A6; margin-bottom: 4px; }
-.tl-sep { color: #D9DEE7; }
-.tl-node { font-family: monospace; font-size: 11px; }
-.tl-detail { font-size: 12px; color: #526075; margin-bottom: 4px; }
-.tl-trace { display: flex; align-items: center; gap: 6px; }
-.trace-label { font-size: 11px; color: #B0B9C6; }
-.trace-val { font-size: 11px; font-family: monospace; color: #8A96A6; }
-.tl-snapshot { display: flex; align-items: center; gap: 6px; margin-top: 3px; }
-.snap-label { font-size: 11px; color: #B0B9C6; }
-.snap-val { font-size: 11px; font-family: monospace; color: #18794E; background: #F0FFF4; padding: 1px 5px; border-radius: 2px; }
-/* Summary sidebar */
-.audit-summary { width: 260px; flex-shrink: 0; background: #fff; border: 1px solid #D9DEE7; border-radius: 6px; padding: 16px; height: fit-content; }
-.summary-title { font-size: 12px; font-weight: 600; color: #0B1220; margin-bottom: 10px; }
-.summary-kv { display: flex; align-items: flex-start; gap: 0; margin-bottom: 7px; }
-.sk { width: 80px; font-size: 12px; color: #8A96A6; flex-shrink: 0; }
-.sv { font-size: 12px; color: #0B1220; }
-.sv.mono { font-family: monospace; }
-.sv.small { font-size: 11px; }
-.ai-decision-row { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
-.ai-skill { font-size: 12px; font-family: monospace; color: #0B1220; }
-.ai-outcome { font-size: 12px; color: #526075; }
+.configuration-log {
+  margin-top: 24px;
+}
+.page {
+  padding: 24px 32px;
+  color: var(--ui-text);
+}
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+.page-header h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+}
+.page-header p {
+  font-size: 13px;
+  color: var(--ui-text-secondary);
+  margin: 5px 0;
+}
+.selector-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: 5px;
+}
+.selector-label {
+  color: var(--ui-text-secondary);
+  font-size: 12px;
+}
+.snapshot-tag {
+  font: 11px var(--ui-font-mono);
+  color: var(--ui-success);
+  background: var(--ui-success-bg);
+  border: 1px solid var(--ui-border);
+  padding: 3px 8px;
+  border-radius: 3px;
+  overflow-wrap: anywhere;
+}
+.audit-layout {
+  display: flex;
+  gap: 16px;
+}
+.timeline-wrap,
+.audit-summary {
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+}
+.timeline-wrap {
+  flex: 1;
+  padding: 20px 24px;
+  min-width: 0;
+}
+.tl-item {
+  display: flex;
+}
+.tl-left {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 20px;
+  flex-shrink: 0;
+  margin-right: 16px;
+}
+.tl-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-top: 4px;
+  flex-shrink: 0;
+  background: var(--ui-text-tertiary);
+}
+.tl-dot.create {
+  background: var(--ui-brand);
+}
+.tl-dot.human {
+  background: var(--ui-success);
+}
+.tl-dot.review {
+  background: var(--ui-warning);
+}
+.tl-dot.complete {
+  background: var(--ui-brand);
+}
+.tl-line {
+  width: 1px;
+  flex: 1;
+  background: var(--ui-border);
+  margin: 4px 0;
+}
+.tl-content {
+  flex: 1;
+  padding-bottom: 18px;
+}
+.tl-header {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.tl-event {
+  font-size: 13px;
+  font-weight: 600;
+}
+.tl-type-tag {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 2px;
+  background: var(--ui-surface-muted);
+  color: var(--ui-text-secondary);
+}
+.tl-type-tag.create,
+.tl-type-tag.complete {
+  color: var(--ui-action-text);
+}
+.tl-type-tag.human {
+  color: var(--ui-success);
+}
+.tl-type-tag.review {
+  color: var(--ui-warning);
+}
+.tl-meta {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--ui-text-secondary);
+}
+.tl-sep {
+  color: var(--ui-border);
+}
+.tl-detail {
+  font-size: 13px;
+  margin-top: 5px;
+  line-height: 1.6;
+}
+.tl-trace {
+  margin-top: 4px;
+  display: flex;
+  gap: 6px;
+}
+.trace-label {
+  font-size: 11px;
+  color: var(--ui-text-tertiary);
+}
+.trace-val {
+  font: 11px var(--ui-font-mono);
+  color: var(--ui-text-secondary);
+}
+.audit-summary {
+  width: 270px;
+  height: max-content;
+  padding: 16px;
+  flex-shrink: 0;
+}
+.summary-title {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.summary-kv {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.sk {
+  width: 88px;
+  flex-shrink: 0;
+  color: var(--ui-text-secondary);
+  font-size: 12px;
+}
+.sv {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.mono {
+  font-family: var(--ui-font-mono);
+}
+.small {
+  font-size: 11px;
+}
+@media (max-width: 900px) {
+  .audit-layout {
+    flex-direction: column;
+  }
+  .audit-summary {
+    width: auto;
+  }
+}
+@media (max-width: 767px) {
+  .configuration-log {
+    margin-top: 24px;
+  }
+  .page {
+    padding: 16px;
+  }
+  .page-header {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .timeline-wrap {
+    padding: 16px 12px;
+  }
+}
 </style>

@@ -1,5 +1,6 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import Layout from '@/components/Layout.vue'
+import { can } from '@/composables/useDemoSession'
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -7,44 +8,154 @@ const router = createRouter({
     { path: '/', redirect: '/login' },
     { path: '/login', component: () => import('@/views/Login.vue') },
     {
-      path: '/app', component: Layout, redirect: '/app/dashboard',
+      path: '/app',
+      component: Layout,
+      redirect: '/app/dashboard',
       children: [
+        {
+          path: 'access-denied',
+          component: () => import('@/views/AccessDenied.vue'),
+        },
         { path: 'dashboard', component: () => import('@/views/Dashboard.vue') },
-        { path: 'operations/requests', component: () => import('@/views/RequestComposer.vue') },
-        { path: 'operations/work-items/:id', component: () => import('@/views/RuntimeWorkbench.vue') },
-        { path: 'operations/my-work', component: () => import('@/views/MyWork.vue') },
-        { path: 'operations/samples', component: () => import('@/views/SamplesPage.vue') },
-        { path: 'operations/tasks', component: () => import('@/views/TasksPage.vue') },
-        { path: 'operations/review', component: () => import('@/views/ReviewCenter.vue') },
-        { path: 'operations/reports', component: () => import('@/views/ReportsPage.vue') },
-        { path: 'scenarios', component: () => import('@/views/ScenarioPackList.vue') },
-        { path: 'scenarios/studio', component: () => import('@/views/ScenarioPackStudio.vue') },
-        { path: 'scenarios/published', component: () => import('@/views/PublishedScenarios.vue') },
-        { path: 'scenarios/activation', component: () => import('@/views/ScenarioActivation.vue') },
-        { path: 'scenarios/versions', component: () => import('@/views/ScenarioVersionDiff.vue') },
-        { path: 'assets/test-items', component: () => import('@/views/TestItemsPage.vue') },
-        { path: 'assets/standards', component: () => import('@/views/StandardsLibrary.vue') },
-        { path: 'assets/methods', component: () => import('@/views/MethodsPage.vue') },
-        { path: 'assets/limits', component: () => import('@/views/LimitsPage.vue') },
-        { path: 'assets/forms', component: () => import('@/views/FormDesigner.vue') },
-        { path: 'assets/reports', component: () => import('@/views/ReportTemplates.vue') },
-        { path: 'workflow/designer', component: () => import('@/views/WorkflowBuilder.vue') },
-        { path: 'workflow/node-types', component: () => import('@/views/NodeTypeCatalog.vue') },
-        { path: 'workflow/ai-skills', component: () => import('@/views/AISkillCenter.vue') },
-        { path: 'workflow/integrations', component: () => import('@/views/IntegrationsPage.vue') },
-        { path: 'resources/equipment', component: () => import('@/views/EquipmentPage.vue') },
-        { path: 'resources/personnel', component: () => import('@/views/PersonnelPage.vue') },
-        { path: 'resources/labs', component: () => import('@/views/LabsPage.vue') },
+        {
+          path: 'operations/requests',
+          component: () => import('@/views/RequestComposer.vue'),
+        },
+        {
+          path: 'operations/work-items/:id',
+          component: () => import('@/views/RuntimeWorkbench.vue'),
+        },
+        {
+          path: 'operations/my-work',
+          component: () => import('@/views/MyWork.vue'),
+        },
+        {
+          path: 'operations/samples',
+          component: () => import('@/views/SamplesPage.vue'),
+        },
+        {
+          path: 'operations/tasks',
+          component: () => import('@/views/TasksPage.vue'),
+        },
+        {
+          path: 'operations/review',
+          component: () => import('@/views/ReviewCenter.vue'),
+        },
+        {
+          path: 'operations/reports',
+          component: () => import('@/views/ReportsPage.vue'),
+        },
+        {
+          path: 'scenarios',
+          component: () => import('@/views/ScenarioPackList.vue'),
+        },
+        {
+          path: 'scenarios/studio',
+          component: () => import('@/views/ScenarioPackStudio.vue'),
+        },
+        {
+          path: 'scenarios/published',
+          component: () => import('@/views/PublishedScenarios.vue'),
+        },
+        {
+          path: 'scenarios/activation',
+          component: () => import('@/views/ScenarioActivation.vue'),
+        },
+        {
+          path: 'scenarios/versions',
+          component: () => import('@/views/ScenarioVersionDiff.vue'),
+        },
+        {
+          path: 'assets/test-items',
+          component: () => import('@/views/TestItemsPage.vue'),
+        },
+        {
+          path: 'assets/standards',
+          component: () => import('@/views/StandardsLibrary.vue'),
+        },
+        {
+          path: 'assets/methods',
+          component: () => import('@/views/MethodsPage.vue'),
+        },
+        {
+          path: 'assets/limits',
+          component: () => import('@/views/LimitsPage.vue'),
+        },
+        {
+          path: 'assets/forms',
+          component: () => import('@/views/FormDesigner.vue'),
+        },
+        {
+          path: 'assets/reports',
+          component: () => import('@/views/ReportTemplates.vue'),
+        },
+        {
+          path: 'workflow/designer',
+          component: () => import('@/views/WorkflowBuilder.vue'),
+        },
+        {
+          path: 'workflow/node-types',
+          component: () => import('@/views/NodeTypeCatalog.vue'),
+        },
+        {
+          path: 'workflow/ai-skills',
+          component: () => import('@/views/AISkillCenter.vue'),
+        },
+        {
+          path: 'workflow/integrations',
+          component: () => import('@/views/IntegrationsPage.vue'),
+        },
+        {
+          path: 'resources/equipment',
+          component: () => import('@/views/EquipmentPage.vue'),
+        },
+        {
+          path: 'resources/personnel',
+          component: () => import('@/views/PersonnelPage.vue'),
+        },
+        {
+          path: 'resources/labs',
+          component: () => import('@/views/LabsPage.vue'),
+        },
         { path: 'workbench/my-work', redirect: '/app/operations/my-work' },
-        { path: 'workbench/field-sampling', component: () => import('@/views/FieldSamplingWorkbench.vue') },
-        { path: 'workbench/metrology', component: () => import('@/views/MetrologyWorkbench.vue') },
+        {
+          path: 'workbench/field-sampling',
+          component: () => import('@/views/FieldSamplingWorkbench.vue'),
+        },
+        {
+          path: 'workbench/metrology',
+          component: () => import('@/views/MetrologyWorkbench.vue'),
+        },
         { path: 'admin/orgs', component: () => import('@/views/OrgAdmin.vue') },
-        { path: 'admin/roles', component: () => import('@/views/RolesAdmin.vue') },
-        { path: 'admin/audit', component: () => import('@/views/AuditTimeline.vue') },
-        { path: 'admin/settings', component: () => import('@/views/SystemSettings.vue') },
+        {
+          path: 'admin/roles',
+          component: () => import('@/views/RolesAdmin.vue'),
+        },
+        {
+          path: 'admin/audit',
+          component: () => import('@/views/AuditTimeline.vue'),
+        },
+        {
+          path: 'admin/settings',
+          component: () => import('@/views/SystemSettings.vue'),
+        },
       ],
     },
     { path: '/:pathMatch(.*)*', redirect: '/app/dashboard' },
   ],
+})
+router.beforeEach((to) => {
+  const permission = to.path.startsWith('/app/admin/roles')
+    ? 'role.manage'
+    : to.path.startsWith('/app/admin/audit')
+      ? 'audit.read'
+      : to.path.startsWith('/app/admin/') ||
+          to.path === '/app/scenarios/studio' ||
+          to.path === '/app/scenarios/activation'
+        ? 'catalog.write'
+        : null
+  if (permission && !can(permission))
+    return { path: '/app/access-denied', query: { from: to.fullPath } }
+  return true
 })
 export default router

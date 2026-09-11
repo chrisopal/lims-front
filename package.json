@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "format": "oxfmt",
-    "test:runtime": "tsc -p tsconfig.runtime.json && node --test scripts/qa/runtime-domain.test.mjs"
+    "test:runtime": "tsc -p tsconfig.runtime.json && node --test scripts/qa/*domain.test.mjs"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.2",

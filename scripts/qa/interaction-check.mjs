@@ -88,53 +88,37 @@ for (const width of [1440, 390]) {
     assert.match(await page.locator('.confirm-grid').innerText(), /v1\.2\.0/);
     await shot('confirm');
   });
-  await test('workflow-inspector', async ({ page, goto, shot, fits }) => {
-    await goto('/app/workflow/designer');
-    await page.locator('button.process-node').first().click();
-    const input = page.locator('.inspector-panel .el-input input').first();
+  await test('workflow-inspector', async ({ page, goto, shot }) => {
+    await goto('/app/scenarios/studio');
+    await page.getByRole('button',{name:'创建新版本',exact:true}).click();
+    await page.getByRole('button',{name:'05 检测流程',exact:true}).click();
+    await page.locator('.flow-node > button').first().click();
+    const input=page.locator('.flow-layout > aside').last().getByRole('textbox').first();
     await input.fill('委托受理-回归检查');
-    assert.match(await page.locator('button.process-node').first().innerText(), /委托受理-回归检查/);
-    assert.match(await page.locator('.technical-section').innerText(), /requestAcceptanceExecutor/);
-    await input.scrollIntoViewIfNeeded(); await shot('properties');
-    await page.getByRole('button', { name: '验证流程', exact: true }).click();
-    await fits('.el-drawer'); await shot('validation');
-    await page.keyboard.press('Escape');
-    await page.locator('.el-drawer').waitFor({ state: 'hidden' });
+    await page.getByRole('button',{name:'保存草稿',exact:true}).click();
+    await page.getByText('草稿已保存',{exact:true}).waitFor();
+    await page.reload();await page.getByRole('button',{name:'05 检测流程',exact:true}).click();
+    assert.match(await page.locator('.flow-node').first().innerText(),/委托受理-回归检查/);
+    await shot('persisted-properties');
+    await page.getByRole('button',{name:'校验',exact:true}).click();
+    await page.getByText('配置校验通过，可以发布新快照',{exact:true}).waitFor();
   });
-  await test('published-drawer', async ({ page, goto, shot, fits }) => {
+  await test('published-readonly', async ({ page, goto, shot }) => {
     await goto('/app/scenarios/published');
-    await page.getByRole('button', { name: '查看', exact: true }).first().click();
-    await fits('.el-drawer'); await shot('overview');
-    for (const tab of ['版本历史', '激活范围', '运行实例']) {
-      await page.locator('.drawer-tabs').getByRole('button', { name: tab, exact: true }).click();
-      await fits('.el-drawer'); await shot(tab === '版本历史' ? 'versions' : tab === '激活范围' ? 'activation' : 'instances');
-    }
-    await page.keyboard.press('Escape');
-    await page.locator('.el-drawer').waitFor({ state: 'hidden' });
+    await page.getByRole('button',{name:'查看快照',exact:true}).first().click();
+    await page.getByText('已发布版本不可直接修改；创建新版本后编辑，不影响历史委托。',{exact:true}).waitFor();
+    assert.equal(await page.getByRole('button',{name:'保存草稿',exact:true}).count(),0);
+    assert(await page.locator('.studio-main input').first().isDisabled());
+    await shot('immutable');
   });
-  await test('field-sampling-controls', async ({ page, goto, shot, fits }) => {
-    await goto('/app/workbench/field-sampling');
-    await fits('.fsw-main');
-    if (width === 390) assert((await page.locator('.fsw-main').boundingBox()).width >= 358, 'Nested execution panel squeezed');
-    await page.locator('.fsw-main').scrollIntoViewIfNeeded(); await shot('workspace');
-    await page.getByRole('button', { name: '完成现场采样', exact: true }).click();
-    await fits('.el-dialog');
-    const complete = page.getByRole('button', { name: '确认完成，移交样品', exact: true });
-    assert(await complete.isDisabled(), 'Required checklist must gate completion');
-    await shot('required-checklist');
-    await page.locator('.el-dialog').getByRole('button', { name: '取消', exact: true }).click();
-    await page.locator('.fsh-bc-link').click();
-    await page.waitForURL('**/#/app/operations/my-work');
-  });
-  await test('metrology-controls', async ({ page, goto, shot, fits }) => {
-    await goto('/app/workbench/metrology');
-    await fits('.ws-main');
-    if (width === 390) assert((await page.locator('.ws-main').boundingBox()).width >= 358, 'Nested metrology panel squeezed');
-    await page.locator('.pfc-feature').nth(1).click();
-    assert.match(await page.locator('.pfc-table').innerText(), /平面度/);
-    await page.locator('.pfc-table').scrollIntoViewIfNeeded(); await shot('feature');
-    await page.getByRole('button', { name: '返回', exact: true }).click();
-    await page.waitForURL('**/#/app/operations/my-work');
+  for(const [name,route] of [['field-sampling-controls','field-sampling'],['metrology-controls','metrology']])await test(name, async ({page,goto,shot})=>{
+    await goto('/app/workbench/'+route);
+    await page.getByText('当前没有该类型工作项。创建相应场景委托并推进到此节点后即可操作。',{exact:true}).waitFor();
+    assert.equal(await page.getByRole('button',{name:'打开工作台',exact:true}).count(),0);
+    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+2));
+    await shot('real-empty-queue');
+    await page.getByRole('button',{name:'新建委托',exact:true}).click();
+    await page.waitForURL('**/#/app/operations/requests');
   });
 }
 await browser.close();

@@ -1,0 +1,147 @@
+apiVersion: lims.huixin.ai/v2
+kind: ScenarioPack
+metadata:
+  key: environment-water-field-lab
+  name: 环境水质现场采样与实验室分析
+  version: 1.0.0
+  description: 包含采样计划、现场采样、样品交接和实验室分析的环境水质场景
+  labels:
+    domain: environment
+    serviceMode: third-party
+
+spec:
+  businessMode: THIRD_PARTY
+  requiredCapabilities:
+    - lab.request
+    - field.sampling
+    - chain.of.custody
+    - lab.sample
+    - physchem.execution
+    - report.generation
+
+  setup:
+    steps:
+      - key: basic
+        name: 基础信息
+        order: 10
+        stepType: BUILTIN
+        required: true
+        rendererKey: scenario-basic-editor
+      - key: subjects
+        name: 监测对象与点位
+        order: 20
+        stepType: CAPABILITY_BINDING
+        required: true
+        rendererKey: subject-type-binding-editor
+      - key: monitoring-items
+        name: 监测项目
+        order: 30
+        stepType: ASSET_BINDING
+        assetType: TEST_ITEM
+        required: true
+        rendererKey: test-capability-matrix
+      - key: compliance
+        name: 法律法规与标准
+        order: 40
+        stepType: ASSET_BINDING
+        assetType: COMPLIANCE_REFERENCE
+        required: true
+        route: /assets/standards
+      - key: sampling-plan
+        name: 采样方案
+        order: 50
+        stepType: CUSTOM_RENDERER
+        required: true
+        rendererKey: sampling-plan-config
+      - key: workflow
+        name: 现场与实验室流程
+        order: 60
+        stepType: WORKFLOW
+        required: true
+        route: /workflow/designer
+        completionValidator: workflow.publishable
+      - key: forms
+        name: 现场与实验室表单
+        order: 70
+        stepType: FORM_SCHEMA
+        required: true
+        rendererKey: scenario-form-binding-editor
+      - key: resources
+        name: 人员与现场设备
+        order: 80
+        stepType: RESOURCE_POLICY
+        required: true
+        rendererKey: resource-policy-editor
+      - key: reports
+        name: 报告
+        order: 90
+        stepType: ASSET_BINDING
+        assetType: REPORT_TEMPLATE
+        required: true
+      - key: validation
+        name: 发布检查
+        order: 100
+        stepType: VALIDATION
+        required: true
+        rendererKey: publish-validation-view
+
+  subjects:
+    allowedTypes:
+      - SAMPLING_POINT
+      - ENVIRONMENTAL_SAMPLE
+
+  testCapabilities:
+    - itemRef: test-item:cod:1.0.0
+      applicableSubjectTypes: [ENVIRONMENTAL_SAMPLE]
+      standardBindings:
+        - standardVersionRef: standard:HJ-COD:current-1
+          methodVersionRef: method:COD-LAB:1.2.0
+      reportTemplateVersionRef: report:ENV-WATER:2.0.0
+      equipmentCapabilities: [UV_VIS]
+
+    - itemRef: test-item:ph:1.0.0
+      applicableSubjectTypes: [SAMPLING_POINT, ENVIRONMENTAL_SAMPLE]
+      standardBindings:
+        - standardVersionRef: standard:ENV-PH:current-1
+          methodVersionRef: method:FIELD-PH:1.0.0
+      reportTemplateVersionRef: report:ENV-WATER:2.0.0
+      equipmentCapabilities: [FIELD_PH_METER]
+
+  complianceReferences:
+    - ref: regulation:ENV-WATER-MONITORING:1.0.0
+      type: REGULATION
+    - ref: standard:HJ-COD:current-1
+      type: STANDARD
+
+  workflow:
+    definitionRef: workflow:environment-water-field-lab:2.0.0
+    entryNodeKey: start
+
+  forms:
+    request: form:environment-project-request:1.0.0
+    subject: form:sampling-point:2.0.0
+    sampling: form:field-sampling-record:3.0.0
+    execution: form:environment-lab-record:2.0.0
+
+  reports:
+    defaultTemplateRef: report:ENV-WATER:2.0.0
+
+  resourcePolicies:
+    - ref: resource-policy:environment-field-team:1.0.0
+      type: QUALIFICATION_POLICY
+
+  aiSkills:
+    - skillRef: ai:sampling-plan-draft:1.0.0
+      trigger: SAMPLING_PLANNING
+      humanApprovalRequired: true
+
+  ui:
+    requestComposerRendererKey: scenario-request-composer
+    defaultRuntimePolicy: NODE_RENDERER
+
+  policies:
+    scenarioVersionLock: true
+    standardVersionLock: true
+    methodVersionLock: true
+    publishedImmutable: true
+    allowRuntimeMigration: false

@@ -1,3 +1,7 @@
+# Historical v2.1 scope
+
+This document describes the previous release. Current scope and verification are in FRONTEND_INTERACTIVE_V2_2.md.
+
 # Frontend v2.1 — local request/work-item interaction
 
 ## Scope

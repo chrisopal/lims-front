@@ -1,3 +1,7 @@
+验收记录：[2026-09-11 完整交互前端](docs/FRONTEND_ACCEPTANCE_2026-09-11.md)。
+
+> 当前升级：完整交互前端 v2.2。使用、模拟边界和验收命令见 [交付说明](docs/FRONTEND_INTERACTIVE_V2_2.md)。
+
 # LIMS 前端：下载与本地运行指南
 
 本项目是 **Laboratory Operations Platform / Composable LIMS** 的前端原型，使用 **Vue 3 + TypeScript + Element Plus + Vue Router + Vite**。

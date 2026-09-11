@@ -21,6 +21,29 @@ const routes = [
   ['my-work', '/app/operations/my-work'],
   ['field-sampling', '/app/workbench/field-sampling'],
   ['metrology', '/app/workbench/metrology'],
+  ['samples', '/app/operations/samples'],
+  ['tasks', '/app/operations/tasks'],
+  ['review', '/app/operations/review'],
+  ['reports', '/app/operations/reports'],
+  ['activation', '/app/scenarios/activation'],
+  ['versions', '/app/scenarios/versions'],
+  ['test-items', '/app/assets/test-items'],
+  ['standards', '/app/assets/standards'],
+  ['methods', '/app/assets/methods'],
+  ['limits', '/app/assets/limits'],
+  ['forms', '/app/assets/forms'],
+  ['report-templates', '/app/assets/reports'],
+  ['node-types', '/app/workflow/node-types'],
+  ['ai-skills', '/app/workflow/ai-skills'],
+  ['integrations', '/app/workflow/integrations'],
+  ['equipment', '/app/resources/equipment'],
+  ['personnel', '/app/resources/personnel'],
+  ['labs', '/app/resources/labs'],
+  ['orgs', '/app/admin/orgs'],
+  ['roles', '/app/admin/roles'],
+  ['audit', '/app/admin/audit'],
+  ['settings', '/app/admin/settings'],
+
 ];
 const report = { commit: process.env.QA_COMMIT || 'local', browser: browser.version(), fixedTime: '2026-09-05T12:00:00Z', pages: [], interactions: [], scope: 'Chromium production preview, not backend E2E or an approved screenshot baseline' };
 
@@ -82,17 +105,16 @@ await check('scenario search and selection', async () => {
 });
 await check('studio preflight navigation', async () => {
   await page.goto(`${baseURL}/#/app/scenarios/studio`, { waitUntil: 'networkidle' });
-  await page.getByRole('button', { name: '发布检查', exact: true }).first().click();
+  await page.getByRole('button', { name: '08 发布检查', exact: true }).first().click();
   if (!await page.locator('body').innerText().then(t => /Preflight|发布前检查|发布检查/.test(t))) throw new Error('Preflight not shown');
   await page.screenshot({ path: path.join(out, 'screenshots/studio-preflight-1440.png'), fullPage: true });
 });
-await check('published catalog drawer', async () => {
+await check('published immutable snapshot', async () => {
   await page.goto(`${baseURL}/#/app/scenarios/published`, { waitUntil: 'networkidle' });
-  await page.getByRole('button', { name: '查看', exact: true }).first().click();
-  await page.locator('.el-drawer').waitFor({ state: 'visible' });
-  await page.screenshot({ path: path.join(out, 'screenshots/published-drawer-1440.png'), fullPage: true });
-  await page.keyboard.press('Escape');
-  await page.locator('.el-drawer').waitFor({ state: 'hidden' });
+  await page.getByRole('button', { name: '查看快照', exact: true }).first().click();
+  await page.getByText('已发布版本不可直接修改；创建新版本后编辑，不影响历史委托。', { exact: true }).waitFor();
+  if(await page.getByRole('button', {name:'保存草稿',exact:true}).count())throw Error('Published state exposes edit action');
+  await page.screenshot({path:path.join(out,'screenshots/published-snapshot-1440.png'),fullPage:true});
 });
 await ctx.close(); await browser.close();
 report.summary = { pages: report.pages.length, pagesPassed: report.pages.filter(x => x.passed).length, interactions: report.interactions.length, interactionsPassed: report.interactions.filter(x => x.passed).length };
