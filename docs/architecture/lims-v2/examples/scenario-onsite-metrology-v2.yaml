@@ -1,0 +1,128 @@
+apiVersion: lims.huixin.ai/v2
+kind: ScenarioPack
+metadata:
+  key: onsite-metrology-dimensional
+  name: 客户现场几何量检测
+  version: 1.0.0
+  description: 面向客户现场的零件几何量与尺寸检测
+  labels:
+    domain: metrology
+    serviceMode: third-party
+
+spec:
+  businessMode: THIRD_PARTY
+  requiredCapabilities:
+    - lab.request
+    - onsite.inspection
+    - metrology.measurement
+    - technical.review
+    - report.generation
+
+  setup:
+    steps:
+      - key: basic
+        name: 基础信息
+        order: 10
+        stepType: BUILTIN
+        required: true
+        rendererKey: scenario-basic-editor
+      - key: subjects
+        name: 零件与特征对象
+        order: 20
+        stepType: CAPABILITY_BINDING
+        required: true
+        rendererKey: subject-type-binding-editor
+      - key: characteristics
+        name: 检测项与特性
+        order: 30
+        stepType: ASSET_BINDING
+        assetType: TEST_ITEM
+        required: true
+        rendererKey: test-capability-matrix
+      - key: standards
+        name: 标准与方法
+        order: 40
+        stepType: ASSET_BINDING
+        assetType: COMPLIANCE_REFERENCE
+        required: true
+        route: /assets/standards
+      - key: workflow
+        name: 现场检测流程
+        order: 50
+        stepType: WORKFLOW
+        required: true
+        route: /workflow/designer
+      - key: resources
+        name: 人员、量具与设备
+        order: 60
+        stepType: RESOURCE_POLICY
+        required: true
+        rendererKey: resource-policy-editor
+      - key: forms
+        name: 测量记录
+        order: 70
+        stepType: FORM_SCHEMA
+        required: true
+        rendererKey: scenario-form-binding-editor
+      - key: reports
+        name: 测量报告
+        order: 80
+        stepType: ASSET_BINDING
+        assetType: REPORT_TEMPLATE
+        required: true
+      - key: validation
+        name: 发布检查
+        order: 90
+        stepType: VALIDATION
+        required: true
+        rendererKey: publish-validation-view
+
+  subjects:
+    allowedTypes:
+      - PART
+      - FEATURE
+      - CHARACTERISTIC
+
+  testCapabilities:
+    - itemRef: test-item:diameter:1.0.0
+      applicableSubjectTypes: [CHARACTERISTIC]
+      standardBindings:
+        - standardVersionRef: standard:ISO-GPS-DIMENSIONAL:1.0.0
+          methodVersionRef: method:CMM-DIAMETER:2.0.0
+          limitRuleVersionRef: limit:TOLERANCE-BAND:1.0.0
+      reportTemplateVersionRef: report:METROLOGY-DIMENSIONAL:3.0.0
+      qualificationPolicyVersionRef: qualification:CMM-OPERATOR-L2:1.0.0
+      equipmentCapabilities: [CMM]
+
+  complianceReferences:
+    - ref: standard:ISO-GPS-DIMENSIONAL:1.0.0
+      type: STANDARD
+
+  workflow:
+    definitionRef: workflow:onsite-metrology-main:1.0.0
+    entryNodeKey: start
+
+  forms:
+    request: form:onsite-metrology-request:1.0.0
+    subject: form:part-feature-characteristic:1.0.0
+    execution: form:metrology-measurement-record:2.0.0
+
+  reports:
+    defaultTemplateRef: report:METROLOGY-DIMENSIONAL:3.0.0
+
+  resourcePolicies:
+    - ref: resource-policy:onsite-metrology-team:1.0.0
+      type: QUALIFICATION_POLICY
+
+  aiSkills: []
+
+  ui:
+    requestComposerRendererKey: scenario-request-composer
+    defaultRuntimePolicy: NODE_RENDERER
+
+  policies:
+    scenarioVersionLock: true
+    standardVersionLock: true
+    methodVersionLock: true
+    publishedImmutable: true
+    allowRuntimeMigration: false

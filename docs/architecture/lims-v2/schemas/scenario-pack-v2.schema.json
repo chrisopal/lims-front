@@ -1,0 +1,193 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lims.huixin.ai/schemas/scenario-pack-v2.schema.json",
+  "title": "LIMS Scenario Pack v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "lims.huixin.ai/v2"},
+    "kind": {"const": "ScenarioPack"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "name", "version"],
+      "properties": {
+        "key": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{2,127}$"},
+        "name": {"type": "string", "minLength": 1, "maxLength": 256},
+        "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[A-Za-z0-9.-]+)?$"},
+        "description": {"type": "string"},
+        "labels": {"type": "object", "additionalProperties": {"type": "string"}}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["businessMode", "setup", "subjects", "workflow", "policies"],
+      "properties": {
+        "businessMode": {"type": "string", "enum": ["INTERNAL", "THIRD_PARTY", "HYBRID"]},
+        "requiredCapabilities": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "setup": {
+          "type": "object",
+          "required": ["steps"],
+          "properties": {
+            "steps": {
+              "type": "array",
+              "minItems": 1,
+              "items": {"$ref": "#/$defs/setupStep"}
+            }
+          }
+        },
+        "subjects": {
+          "type": "object",
+          "required": ["allowedTypes"],
+          "properties": {
+            "allowedTypes": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {"type": "string"}
+            }
+          }
+        },
+        "testCapabilities": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/testCapability"}
+        },
+        "complianceReferences": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/versionedRef"}
+        },
+        "workflow": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["definitionRef"],
+          "properties": {
+            "definitionRef": {"type": "string", "minLength": 1},
+            "entryNodeKey": {"type": "string"}
+          }
+        },
+        "forms": {
+          "type": "object",
+          "additionalProperties": {"type": "string"}
+        },
+        "reports": {
+          "type": "object",
+          "properties": {
+            "defaultTemplateRef": {"type": "string"},
+            "templates": {"type": "array", "items": {"type": "string"}}
+          }
+        },
+        "resourcePolicies": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/versionedRef"}
+        },
+        "aiSkills": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/aiSkillBinding"}
+        },
+        "ui": {
+          "type": "object",
+          "properties": {
+            "requestComposerRendererKey": {"type": "string"},
+            "defaultRuntimePolicy": {"type": "string", "enum": ["NODE_RENDERER", "GENERIC_WORKBENCH"]}
+          }
+        },
+        "activationDefaults": {
+          "type": "object",
+          "properties": {
+            "requiresExplicitActivation": {"type": "boolean"}
+          }
+        },
+        "policies": {
+          "type": "object",
+          "required": ["scenarioVersionLock", "publishedImmutable"],
+          "properties": {
+            "scenarioVersionLock": {"const": true},
+            "standardVersionLock": {"type": "boolean"},
+            "methodVersionLock": {"type": "boolean"},
+            "publishedImmutable": {"const": true},
+            "allowRuntimeMigration": {"type": "boolean", "default": false}
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "setupStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "name", "order", "stepType", "required"],
+      "properties": {
+        "key": {"type": "string", "pattern": "^[a-z][a-z0-9-]{1,63}$"},
+        "name": {"type": "string", "minLength": 1},
+        "order": {"type": "integer", "minimum": 0},
+        "stepType": {
+          "type": "string",
+          "enum": ["BUILTIN", "ASSET_BINDING", "WORKFLOW", "FORM_SCHEMA", "CAPABILITY_BINDING", "RESOURCE_POLICY", "AI_SKILL_BINDING", "CUSTOM_RENDERER", "VALIDATION"]
+        },
+        "required": {"type": "boolean"},
+        "dependsOn": {"type": "array", "items": {"type": "string"}},
+        "assetType": {"type": "string"},
+        "rendererKey": {"type": "string"},
+        "route": {"type": "string"},
+        "completionValidator": {"type": "string"},
+        "permissionCode": {"type": "string"},
+        "helpText": {"type": "string"},
+        "config": {"type": "object"}
+      }
+    },
+    "versionedRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref"],
+      "properties": {
+        "ref": {"type": "string", "minLength": 1},
+        "type": {"type": "string"},
+        "scope": {"type": "string"}
+      }
+    },
+    "testCapability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["itemRef", "applicableSubjectTypes", "standardBindings"],
+      "properties": {
+        "itemRef": {"type": "string"},
+        "applicableSubjectTypes": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "standardBindings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["standardVersionRef", "methodVersionRef"],
+            "properties": {
+              "standardVersionRef": {"type": "string"},
+              "methodVersionRef": {"type": "string"},
+              "limitRuleVersionRef": {"type": "string"},
+              "formulaVersionRef": {"type": "string"}
+            }
+          }
+        },
+        "reportTemplateVersionRef": {"type": "string"},
+        "qualificationPolicyVersionRef": {"type": "string"},
+        "equipmentCapabilities": {"type": "array", "items": {"type": "string"}},
+        "aiSkillVersionRefs": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "aiSkillBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["skillRef", "trigger", "humanApprovalRequired"],
+      "properties": {
+        "skillRef": {"type": "string"},
+        "trigger": {"type": "string"},
+        "humanApprovalRequired": {"type": "boolean"},
+        "inputMapping": {"type": "object"},
+        "outputMapping": {"type": "object"}
+      }
+    }
+  }
+}

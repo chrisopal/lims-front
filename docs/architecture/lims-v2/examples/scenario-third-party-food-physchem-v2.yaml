@@ -1,0 +1,191 @@
+apiVersion: lims.huixin.ai/v2
+kind: ScenarioPack
+metadata:
+  key: third-party-food-physchem
+  name: 第三方食品理化检测
+  version: 1.2.0
+  description: 面向第三方食品实验室的理化检测场景
+  labels:
+    domain: food
+    serviceMode: third-party
+
+spec:
+  businessMode: THIRD_PARTY
+
+  requiredCapabilities:
+    - lab.request
+    - lab.sample
+    - lab.planning
+    - physchem.execution
+    - technical.review
+    - report.generation
+
+  setup:
+    steps:
+      - key: basic
+        name: 基础信息
+        order: 10
+        stepType: BUILTIN
+        required: true
+        rendererKey: scenario-basic-editor
+
+      - key: subjects
+        name: 检测对象
+        order: 20
+        stepType: CAPABILITY_BINDING
+        required: true
+        rendererKey: subject-type-binding-editor
+        dependsOn: [basic]
+
+      - key: test-items
+        name: 检测项
+        order: 30
+        stepType: ASSET_BINDING
+        assetType: TEST_ITEM
+        required: true
+        rendererKey: test-capability-matrix
+        route: /assets/test-items
+        completionValidator: scenario.test-items.non-empty
+        dependsOn: [subjects]
+
+      - key: standards
+        name: 法律法规与标准
+        order: 40
+        stepType: ASSET_BINDING
+        assetType: COMPLIANCE_REFERENCE
+        required: true
+        route: /assets/standards
+        completionValidator: scenario.compliance.complete
+        dependsOn: [test-items]
+
+      - key: methods
+        name: 检测方法与限值
+        order: 50
+        stepType: ASSET_BINDING
+        assetType: METHOD
+        required: true
+        rendererKey: method-limit-binding-editor
+        completionValidator: scenario.methods.complete
+        dependsOn: [standards]
+
+      - key: workflow
+        name: 检测流程
+        order: 60
+        stepType: WORKFLOW
+        required: true
+        route: /workflow/designer
+        completionValidator: workflow.publishable
+        dependsOn: [methods]
+
+      - key: forms
+        name: 动态表单
+        order: 70
+        stepType: FORM_SCHEMA
+        required: true
+        rendererKey: scenario-form-binding-editor
+        dependsOn: [workflow]
+
+      - key: resources
+        name: 资源与资质
+        order: 80
+        stepType: RESOURCE_POLICY
+        required: true
+        rendererKey: resource-policy-editor
+        dependsOn: [methods]
+
+      - key: reports
+        name: 报告
+        order: 90
+        stepType: ASSET_BINDING
+        assetType: REPORT_TEMPLATE
+        required: true
+        route: /assets/report-templates
+        dependsOn: [test-items]
+
+      - key: ai
+        name: AI能力
+        order: 100
+        stepType: AI_SKILL_BINDING
+        required: false
+        rendererKey: ai-skill-binding-editor
+
+      - key: validation
+        name: 发布检查
+        order: 110
+        stepType: VALIDATION
+        required: true
+        rendererKey: publish-validation-view
+        dependsOn: [workflow, reports]
+
+  subjects:
+    allowedTypes:
+      - FOOD_SAMPLE
+
+  testCapabilities:
+    - itemRef: test-item:pb:1.0.0
+      applicableSubjectTypes: [FOOD_SAMPLE]
+      standardBindings:
+        - standardVersionRef: standard:GB-5009.12:2023
+          methodVersionRef: method:ICP-MS-PB:2.0.0
+          limitRuleVersionRef: limit:FOOD-PB-LIMIT:3.1.0
+      reportTemplateVersionRef: report:FOOD-PHYSCHEM:4.0.0
+      qualificationPolicyVersionRef: qualification:PHYSCHEM-L2:1.0.0
+      equipmentCapabilities: [ICP_MS]
+      aiSkillVersionRefs: [ai:standard-match:1.2.0]
+
+    - itemRef: test-item:cd:1.0.0
+      applicableSubjectTypes: [FOOD_SAMPLE]
+      standardBindings:
+        - standardVersionRef: standard:GB-5009.15:2023
+          methodVersionRef: method:ICP-MS-CD:2.0.0
+          limitRuleVersionRef: limit:FOOD-CD-LIMIT:2.0.0
+      reportTemplateVersionRef: report:FOOD-PHYSCHEM:4.0.0
+      qualificationPolicyVersionRef: qualification:PHYSCHEM-L2:1.0.0
+      equipmentCapabilities: [ICP_MS]
+
+  complianceReferences:
+    - ref: standard:GB-5009.12:2023
+      type: STANDARD
+    - ref: standard:GB-5009.15:2023
+      type: STANDARD
+
+  workflow:
+    definitionRef: workflow:food-thirdparty-main:3.0.0
+    entryNodeKey: start
+
+  forms:
+    request: form:food-thirdparty-request:2.1.0
+    subject: form:food-sample:3.0.0
+    execution: form:physchem-raw-record:2.0.0
+
+  reports:
+    defaultTemplateRef: report:FOOD-PHYSCHEM:4.0.0
+
+  resourcePolicies:
+    - ref: resource-policy:food-physchem:1.0.0
+      type: QUALIFICATION_POLICY
+
+  aiSkills:
+    - skillRef: ai:standard-match:1.2.0
+      trigger: REQUEST_PLANNING
+      humanApprovalRequired: true
+    - skillRef: ai:report-draft:2.0.0
+      trigger: REPORT_GENERATION
+      humanApprovalRequired: true
+    - skillRef: ai:report-review:1.4.0
+      trigger: REPORT_REVIEW
+      humanApprovalRequired: true
+
+  ui:
+    requestComposerRendererKey: scenario-request-composer
+    defaultRuntimePolicy: NODE_RENDERER
+
+  activationDefaults:
+    requiresExplicitActivation: true
+
+  policies:
+    scenarioVersionLock: true
+    standardVersionLock: true
+    methodVersionLock: true
+    publishedImmutable: true
+    allowRuntimeMigration: false

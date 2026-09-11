@@ -1,0 +1,216 @@
+import type { CatalogField } from './CatalogResourcePage.vue'
+
+export const catalogConfigs = {
+  'test-items': {
+    title: '检测项目录',
+    subtitle: 'Test Item Catalog · 统一维护检测项与标准、方法、限值关系',
+    resourceLabel: '检测项',
+    fields: [
+      {
+        key: 'category',
+        label: '专业域',
+        type: 'select',
+        options: ['FOOD', 'ENV', 'MET'],
+        required: true,
+      },
+      { key: 'standard', label: '适用标准', required: true, width: 180 },
+      { key: 'method', label: '检测方法', required: true, width: 170 },
+      { key: 'limit', label: '限值规则', required: true, width: 170 },
+      { key: 'unit', label: '结果单位', required: true },
+      { key: 'description', label: '业务说明', type: 'textarea' },
+    ] as CatalogField[],
+  },
+  standards: {
+    title: '法律法规与标准库',
+    subtitle: 'Regulation & Standard Library · 维护版本、生效日期与适用检测项',
+    resourceLabel: '标准',
+    fields: [
+      {
+        key: 'category',
+        label: '标准类型',
+        type: 'select',
+        options: ['国家标准', '环境标准', '国际标准', '企业标准'],
+        required: true,
+      },
+      { key: 'effectiveDate', label: '生效日期', type: 'text', required: true },
+      { key: 'domain', label: '适用专业域', required: true },
+      { key: 'publisher', label: '发布机构' },
+      { key: 'itemCount', label: '关联检测项', type: 'number' },
+    ] as CatalogField[],
+  },
+  methods: {
+    title: '检测方法库',
+    subtitle: 'Method Library · 管理方法原理、适用范围、设备与确认记录',
+    resourceLabel: '检测方法',
+    fields: [
+      { key: 'principle', label: '方法原理', required: true },
+      { key: 'scope', label: '适用范围', required: true },
+      { key: 'equipment', label: '默认设备', required: true },
+      { key: 'qualification', label: '方法确认', required: true },
+      { key: 'steps', label: '关键步骤', type: 'textarea' },
+    ] as CatalogField[],
+  },
+  limits: {
+    title: '限值与公式',
+    subtitle: 'Limits & Rules · 维护检测项限值、单位与可审计判定表达式',
+    resourceLabel: '限值规则',
+    fields: [
+      { key: 'itemCode', label: '关联检测项', required: true },
+      { key: 'unit', label: '结果单位', required: true },
+      { key: 'expression', label: '判定表达式', required: true },
+      { key: 'parameters', label: '参数列表', required: true },
+    ] as CatalogField[],
+  },
+  forms: {
+    title: '动态表单设计器',
+    subtitle: 'Form Designer · 管理节点采集字段、必填规则与业务作用域',
+    resourceLabel: '动态表单',
+    fields: [
+      { key: 'category', label: '表单分类', required: true },
+      { key: 'scope', label: '绑定节点', required: true },
+      { key: 'fields', label: '字段定义', type: 'textarea', required: true },
+    ] as CatalogField[],
+  },
+  reports: {
+    title: '报告模板库',
+    subtitle: 'Report Templates · 维护报告版式、章节结构与审核签发策略',
+    resourceLabel: '报告模板',
+    fields: [
+      { key: 'category', label: '报告分类', required: true },
+      {
+        key: 'outputFormat',
+        label: '输出格式',
+        type: 'select',
+        options: ['PDF', 'DOCX'],
+        required: true,
+      },
+      { key: 'sections', label: '章节结构', type: 'textarea', required: true },
+      { key: 'signPolicy', label: '签发策略', required: true },
+    ] as CatalogField[],
+  },
+  equipment: {
+    title: '设备台账',
+    subtitle: 'Equipment Registry · 管理检测设备状态、校准到期日与责任人',
+    resourceLabel: '设备',
+    fields: [
+      { key: 'category', label: '设备类别', required: true },
+      { key: 'lab', label: '所属实验室', required: true },
+      { key: 'manufacturer', label: '制造商', required: true },
+      { key: 'model', label: '型号' },
+      { key: 'calibrationDue', label: '校准到期', required: true },
+      {
+        key: 'state',
+        label: '设备状态',
+        type: 'select',
+        options: ['在用', '维护', '封存'],
+        required: true,
+      },
+      { key: 'responsible', label: '责任人', required: true },
+    ] as CatalogField[],
+  },
+  personnel: {
+    title: '人员资质',
+    subtitle: 'Personnel Qualifications · 管理岗位、能力范围、证书与有效期',
+    resourceLabel: '人员',
+    fields: [
+      { key: 'role', label: '岗位', required: true },
+      { key: 'lab', label: '所属实验室', required: true },
+      {
+        key: 'qualifications',
+        label: '能力范围',
+        type: 'textarea',
+        required: true,
+      },
+      { key: 'certificate', label: '证书编号', required: true },
+      { key: 'validUntil', label: '证书有效期', required: true },
+    ] as CatalogField[],
+  },
+  labs: {
+    title: '实验室资源',
+    subtitle: 'Laboratory Resources · 维护实验室能力域、地点、时区与产能',
+    resourceLabel: '实验室',
+    fields: [
+      { key: 'capability', label: '能力域', required: true },
+      { key: 'location', label: '所在地', required: true },
+      { key: 'timezone', label: '时区', required: true },
+      { key: 'contact', label: '运营联系人', required: true },
+      {
+        key: 'capacity',
+        label: '产能级别',
+        type: 'select',
+        options: ['小型', '中型', '大型'],
+        required: true,
+      },
+    ] as CatalogField[],
+  },
+  orgs: {
+    title: '组织与实验室',
+    subtitle: 'Organization Directory · 维护组织层级、区域与负责人',
+    resourceLabel: '组织',
+    fields: [
+      {
+        key: 'type',
+        label: '组织类型',
+        type: 'select',
+        options: ['平台组织', '业务组织', '实验室组织'],
+        required: true,
+      },
+      { key: 'region', label: '覆盖区域', required: true },
+      { key: 'parent', label: '上级组织' },
+      { key: 'manager', label: '负责人', required: true },
+    ] as CatalogField[],
+  },
+  roles: {
+    title: '角色权限',
+    subtitle: 'Role Policies · 配置角色职责和可用能力策略（本地模拟授权）',
+    resourceLabel: '角色',
+    fields: [
+      {
+        key: 'description',
+        label: '职责说明',
+        type: 'textarea',
+        required: true,
+      },
+      { key: 'policies', label: '能力策略', type: 'textarea', required: true },
+    ] as CatalogField[],
+  },
+  settings: {
+    title: '系统设置',
+    subtitle: 'System Settings · 管理本地演示环境的数据保留、时区与导出规则',
+    resourceLabel: '系统设置',
+    fields: [
+      { key: 'key', label: '设置键', required: true },
+      { key: 'value', label: '设置值', required: true },
+      { key: 'category', label: '设置分类', required: true },
+      { key: 'editable', label: '编辑策略', required: true },
+    ] as CatalogField[],
+  },
+  integrations: {
+    title: '集成能力',
+    subtitle: 'Integrations · 管理外部系统连接配置；本地演示不会宣称真实连接',
+    resourceLabel: '集成配置',
+    fields: [
+      { key: 'provider', label: '连接类型', required: true },
+      { key: 'direction', label: '数据方向', required: true },
+      { key: 'endpoint', label: '端点', required: true },
+      { key: 'authMode', label: '认证方式', required: true },
+      { key: 'lastSync', label: '最近同步' },
+    ] as CatalogField[],
+  },
+  'ai-skills': {
+    title: 'AI Skills 中心',
+    subtitle: 'AI Skill Center · 管理输入输出契约、触发阶段与人工确认策略',
+    resourceLabel: 'AI Skill',
+    fields: [
+      { key: 'category', label: '能力类别', required: true },
+      { key: 'trigger', label: '触发阶段', required: true },
+      { key: 'inputSchema', label: '输入契约', required: true },
+      { key: 'outputSchema', label: '输出契约', required: true },
+      { key: 'approval', label: '人工确认', required: true },
+      { key: 'riskPolicy', label: '风险策略', required: true },
+      { key: 'owner', label: '责任团队', required: true },
+    ] as CatalogField[],
+  },
+} as const
+
+export type CatalogConfigKey = keyof typeof catalogConfigs

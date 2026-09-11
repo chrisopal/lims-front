@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lims.huixin.ai/schemas/workflow-v2.schema.json",
+  "title": "LIMS Workflow Definition v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "lims.huixin.ai/v2"},
+    "kind": {"const": "WorkflowDefinition"},
+    "metadata": {
+      "type": "object",
+      "required": ["key", "name", "version"],
+      "properties": {
+        "key": {"type": "string"},
+        "name": {"type": "string"},
+        "version": {"type": "string"},
+        "description": {"type": "string"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "required": ["nodes", "edges"],
+      "properties": {
+        "variablesSchemaRef": {"type": "string"},
+        "nodes": {
+          "type": "array",
+          "minItems": 2,
+          "items": {"$ref": "#/$defs/node"}
+        },
+        "edges": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/edge"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "name", "nodeType"],
+      "properties": {
+        "key": {"type": "string", "pattern": "^[a-z][a-z0-9-]{1,63}$"},
+        "name": {"type": "string"},
+        "nodeType": {"type": "string"},
+        "config": {"type": "object"},
+        "inputMapping": {"type": "object"},
+        "outputMapping": {"type": "object"},
+        "assigneePolicy": {"type": "object"},
+        "slaPolicy": {"type": "object"},
+        "retryPolicy": {"type": "object"},
+        "incidentPolicy": {"type": "object"},
+        "ui": {"type": "object"}
+      }
+    },
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "to"],
+      "properties": {
+        "from": {"type": "string"},
+        "to": {"type": "string"},
+        "label": {"type": "string"},
+        "priority": {"type": "integer", "default": 0},
+        "condition": {
+          "type": "object",
+          "properties": {
+            "language": {"type": "string", "enum": ["CEL", "RULE_REF"]},
+            "expression": {"type": "string"},
+            "ruleRef": {"type": "string"}
+          }
+        }
+      }
+    }
+  }
+}

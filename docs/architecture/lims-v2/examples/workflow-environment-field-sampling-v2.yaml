@@ -1,0 +1,74 @@
+apiVersion: lims.huixin.ai/v2
+kind: WorkflowDefinition
+metadata:
+  key: environment-water-field-lab
+  name: 环境水质现场采样与实验室分析流程
+  version: 2.0.0
+
+spec:
+  nodes:
+    - key: start
+      name: 开始
+      nodeType: START
+
+    - key: intake
+      name: 委托受理
+      nodeType: REQUEST_ACCEPTANCE
+
+    - key: sampling-plan
+      name: 采样计划
+      nodeType: SAMPLING_PLAN
+      assigneePolicy:
+        candidateRoles: [ENV_PROJECT_MANAGER]
+
+    - key: field-sampling
+      name: 现场采样
+      nodeType: FIELD_SAMPLING
+      config:
+        requireGps: true
+        requirePhotos: true
+        custodyRequired: true
+      assigneePolicy:
+        candidateRoles: [FIELD_SAMPLER]
+      slaPolicy:
+        durationHours: 8
+
+    - key: sample-receipt
+      name: 实验室接收
+      nodeType: SAMPLE_RECEIPT
+
+    - key: lab-test
+      name: 实验室检测
+      nodeType: LAB_TEST_EXECUTION
+
+    - key: review
+      name: 技术审核
+      nodeType: TECHNICAL_REVIEW
+      assigneePolicy:
+        candidateRoles: [TECHNICAL_REVIEWER]
+
+    - key: report
+      name: 报告生成
+      nodeType: REPORT_GENERATION
+
+    - key: end
+      name: 完成
+      nodeType: END
+
+  edges:
+    - from: start
+      to: intake
+    - from: intake
+      to: sampling-plan
+    - from: sampling-plan
+      to: field-sampling
+    - from: field-sampling
+      to: sample-receipt
+    - from: sample-receipt
+      to: lab-test
+    - from: lab-test
+      to: review
+    - from: review
+      to: report
+    - from: report
+      to: end
